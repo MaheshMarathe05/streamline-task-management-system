@@ -48,6 +48,10 @@ UserSchema.pre("save", async function (next) {
     if (!this.isModified("password") || !this.password) {
       return next();
     }
+    // Prevent double-hashing: if the password already looks like an Argon2 hash, skip.
+    if (typeof this.password === 'string' && this.password.startsWith('$argon2')) {
+      return next();
+    }
     // Use secure defaults; you can tune memoryCost/timeCost via env if needed.
     this.password = await argon2.hash(this.password, {
       type: argon2.argon2id

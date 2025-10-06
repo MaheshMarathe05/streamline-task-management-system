@@ -6,7 +6,9 @@ import Team from '../models/Team.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import argon2 from 'argon2';
+// NOTE: Do NOT hash passwords manually here. The User model pre-save hook
+// applies Argon2 hashing automatically. Manual hashing here would cause
+// double hashing and make logins fail.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -184,10 +186,9 @@ const seedDatabase = async () => {
     const createdUsers = [];
     
     for (const userData of usersData) {
-      const hashedPassword = await argon2.hash(userData.password);
+      // Provide plain password; User model pre-save hook will hash it once.
       const user = await User.create({
         ...userData,
-        password: hashedPassword,
         twoFactor: {
           backupCodes: [] // We'll skip backup codes for seed data
         }

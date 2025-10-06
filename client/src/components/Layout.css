@@ -9,13 +9,13 @@
 
 .main-sidebar {
   width: 280px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
   display: flex;
   flex-direction: column;
   padding: 2rem 1.5rem;
   flex-shrink: 0;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-colorful);
   z-index: 10;
 }
 
@@ -25,9 +25,9 @@
 }
 
 .logo {
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #a855f7 100%);
   border-radius: var(--radius-xl);
   color: #fff;
   display: flex;
@@ -36,7 +36,7 @@
   font-size: 2rem;
   font-weight: 800;
   margin: 0 auto 1rem auto;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
 }
 
 .company-name {
@@ -84,13 +84,13 @@
   top: 0;
   height: 100%;
   width: 4px;
-  background: var(--primary-500);
+  background: linear-gradient(180deg, #0ea5e9 0%, #a855f7 100%);
   transform: scaleY(0);
   transition: transform 0.2s ease;
 }
 
 .nav-link:hover {
-  background: var(--bg-accent);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
   color: var(--text-primary);
   transform: translateX(4px);
 }
@@ -100,9 +100,10 @@
 }
 
 .nav-link.active {
-  background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
-  color: var(--primary-700);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+  color: #0369a1;
   font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 
 .nav-link.active::before {
@@ -145,21 +146,23 @@
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-radius: var(--radius-lg);
-  background: var(--bg-tertiary);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);
   margin-bottom: 1rem;
+  border: 1px solid rgba(14, 165, 233, 0.15);
 }
 
 .user-avatar {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+  background: linear-gradient(135deg, #0ea5e9 0%, #a855f7 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  font-weight: 700;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
 .user-info {
@@ -187,7 +190,7 @@
 .content-wrapper {
   flex: 1;
   overflow-y: auto;
-  background: var(--bg-primary);
+  background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
   position: relative;
 }
 

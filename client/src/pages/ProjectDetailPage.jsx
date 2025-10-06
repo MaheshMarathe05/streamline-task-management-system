@@ -1,33 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  getProject, 
-  getTasks, 
-  updateProject, 
-  deleteProject, 
-  getProjectAnalytics,
-  addProjectComment 
-} from '../services/api';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Users, 
-  Target, 
-  Clock, 
-  MessageCircle, 
-  Paperclip, 
-  Edit3, 
-  Trash2, 
-  BarChart3,
-  CheckCircle2,
-  AlertCircle,
-  Play,
-  Pause,
-  Flag,
-  TrendingUp
-} from 'lucide-react';
-import MonitorProgress from '../components/MonitorProgress';
+import { projectsApi } from '../services/apiClient.js';
+import { ArrowLeft, Calendar, Users, Target, Clock, BarChart3, CheckCircle2, AlertCircle, Play, Pause, Flag } from 'lucide-react';
 import './ProjectDetailPage.css';
 
 const ProjectDetailPage = () => {
@@ -37,1016 +12,136 @@ const ProjectDetailPage = () => {
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [analytics, setAnalytics] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
-  const [newComment, setNewComment] = useState('');
-  const [isAddingComment, setIsAddingComment] = useState(false);
-  const isManager = user?.role === 'manager';
+  const [commentValue, setCommentValue] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchProjectDetails();
-  }, [projectId]);
+  useEffect(() => { if (projectId) load(); }, [projectId]);
 
-  const fetchProjectDetails = async () => {
+  async function load() {
+    setLoading(true); setError(null);
     try {
-      setIsLoading(true);
-      
-      console.log('🔍 ProjectDetailPage - Fetching project ID:', projectId);
-      
-      // Try to fetch real data first
-      try {
-        const projectData = await getProject(projectId);
-        const projectTasks = await getTasks(projectId); // Pass projectId to filter tasks
-        
-        if (projectData && projectData.data) {
-          setProject(projectData.data);
-          setTasks(projectTasks.data || []);
-          console.log('✅ Loaded real project data:', projectData.data.name);
-          console.log('✅ Loaded project tasks:', projectTasks.data?.length || 0, 'tasks');
-          return;
-        }
-      } catch (apiError) {
-        console.log('API call failed, using demo data:', apiError);
-      }
-      
-      // Fallback to realistic demo data for presentation - map by actual project IDs from DB
-      const demoProjects = {
-        '68e0f0edfec5a3b5fb390575': {
-          _id: '68e0f0edfec5a3b5fb390575',
-          name: 'E-commerce Website',
-          description: 'Build a modern e-commerce platform with React and Node.js featuring secure payment processing, real-time inventory management, customer analytics dashboard, and mobile-responsive design. The platform will support multiple payment gateways including Stripe and PayPal, advanced product filtering, wishlist functionality, and admin panel for order management.',
-          status: 'Ongoing',
-          priority: 'High',
-          progress: 65,
-          deadline: '2025-12-15T00:00:00.000Z',
-          startDate: '2024-10-01T00:00:00.000Z',
-          endDate: '2025-12-15T00:00:00.000Z',
-          estimatedHours: 480,
-          actualHours: 312,
-          members: [
-            { _id: '1', user: { _id: '1', name: 'Alice Developer', email: 'alice.dev@gmail.com' }, role: 'Lead Developer' },
-            { _id: '2', user: { _id: '2', name: 'Bob Designer', email: 'bob.design@outlook.com' }, role: 'UI/UX Designer' },
-            { _id: '3', user: { _id: '3', name: 'Carol Tester', email: 'carol.test@yahoo.com' }, role: 'QA Engineer' }
-          ],
-          manager: { _id: 'manager1', name: 'John Manager', email: 'john.manager@gmail.com' },
-          tags: ['React', 'Node.js', 'MongoDB', 'Stripe API', 'AWS', 'Payment Gateway'],
-          comments: [
-            {
-              _id: 'comment1',
-              user: { name: 'John Manager', role: 'Manager' },
-              text: 'Great progress on the frontend! The product catalog looks fantastic with the new filtering system. Let\'s focus on the payment integration next week.',
-              createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment2',
-              user: { name: 'Alice Developer', role: 'Developer' },
-              text: 'Payment gateway integration is 85% complete. Stripe API is working perfectly for card payments. Working on PayPal integration and will add Apple Pay support.',
-              createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment3',
-              user: { name: 'Bob Designer', role: 'Designer' },
-              text: 'Updated the checkout flow design based on user feedback. Added progress indicators, trust badges, and improved mobile responsiveness. Prototype ready for review.',
-              createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-            }
-          ],
-          budget: 75000,
-          spent: 48750,
-          createdAt: '2024-10-01T00:00:00.000Z'
-        },
-        '68e0f0edfec5a3b5fb39057b': {
-          _id: '68e0f0edfec5a3b5fb39057b',
-          name: 'Mobile App Development',
-          description: 'Create a cross-platform mobile app using React Native with advanced features including real-time chat, push notifications, offline capabilities, biometric authentication, and social sharing. The app will integrate with Firebase for backend services, implement Redux for state management, and support both iOS and Android platforms with native performance.',
-          status: 'Ongoing',
-          priority: 'High',
-          progress: 48,
-          deadline: '2025-11-30T00:00:00.000Z',
-          startDate: '2024-09-15T00:00:00.000Z',
-          endDate: '2025-11-30T00:00:00.000Z',
-          estimatedHours: 380,
-          actualHours: 182,
-          members: [
-            { _id: '1', user: { _id: '1', name: 'Alice Developer', email: 'alice.dev@gmail.com' }, role: 'Mobile Developer' },
-            { _id: '4', user: { _id: '4', name: 'David Frontend', email: 'david.frontend@hotmail.com' }, role: 'Frontend Developer' },
-            { _id: '3', user: { _id: '3', name: 'Carol Tester', email: 'carol.test@yahoo.com' }, role: 'QA Tester' }
-          ],
-          manager: { _id: 'manager1', name: 'John Manager', email: 'john.manager@gmail.com' },
-          tags: ['React Native', 'Firebase', 'Socket.io', 'Redux', 'TypeScript', 'iOS', 'Android'],
-          comments: [
-            {
-              _id: 'comment1',
-              user: { name: 'John Manager', role: 'Manager' },
-              text: 'The authentication flow is working perfectly! Great job on implementing biometric login with Face ID and Touch ID. Let\'s move forward with the real-time chat features.',
-              createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment2',
-              user: { name: 'Alice Developer', role: 'Developer' },
-              text: 'Real-time chat is now functional with Socket.io. Added end-to-end encryption, file sharing up to 10MB, and typing indicators. Testing push notifications for iOS and Android.',
-              createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment3',
-              user: { name: 'David Frontend', role: 'Developer' },
-              text: 'Offline mode implementation is complete using AsyncStorage. App can now sync data when connection is restored. Performance metrics showing 60fps consistently.',
-              createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-            }
-          ],
-          budget: 68000,
-          spent: 32640,
-          createdAt: '2024-09-15T00:00:00.000Z'
-        },
-        '68e0f0edfec5a3b5fb390581': {
-          _id: '68e0f0edfec5a3b5fb390581',
-          name: 'Company Website Redesign',
-          description: 'Redesign the company website with modern UI/UX principles, implementing responsive design, improved accessibility (WCAG 2.1 AA compliance), faster load times through optimization, SEO enhancements, blog integration with CMS, contact forms with validation, and interactive portfolio showcase. The redesign will modernize our brand presence and improve user engagement.',
-          status: 'Completed',
-          priority: 'Low',
-          progress: 100,
-          deadline: '2025-09-20T00:00:00.000Z',
-          startDate: '2024-08-01T00:00:00.000Z',
-          endDate: '2024-09-20T00:00:00.000Z',
-          estimatedHours: 240,
-          actualHours: 235,
-          members: [
-            { _id: '2', user: { _id: '2', name: 'Bob Designer', email: 'bob.design@outlook.com' }, role: 'UI/UX Designer' },
-            { _id: '1', user: { _id: '1', name: 'Alice Developer', email: 'alice.dev@gmail.com' }, role: 'Frontend Developer' },
-            { _id: '3', user: { _id: '3', name: 'Carol Tester', email: 'carol.test@yahoo.com' }, role: 'QA Specialist' }
-          ],
-          manager: { _id: 'manager1', name: 'John Manager', email: 'john.manager@gmail.com' },
-          tags: ['UI/UX', 'Figma', 'HTML5', 'CSS3', 'Accessibility', 'SEO', 'Responsive Design'],
-          comments: [
-            {
-              _id: 'comment1',
-              user: { name: 'John Manager', role: 'Manager' },
-              text: 'Excellent work team! The new design is clean, modern, and perfectly represents our brand. Launch was smooth and client feedback has been overwhelmingly positive! 🎉',
-              createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment2',
-              user: { name: 'Bob Designer', role: 'Designer' },
-              text: 'Thanks everyone! The design system we created will make future updates much easier. All components are documented in Storybook for reference.',
-              createdAt: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment3',
-              user: { name: 'Alice Developer', role: 'Developer' },
-              text: 'Page load times improved by 60%! Lighthouse score is now 95+ across all metrics. Mobile performance is excellent with lazy loading and optimized images.',
-              createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ],
-          budget: 45000,
-          spent: 44200,
-          createdAt: '2024-08-01T00:00:00.000Z'
-        },
-        '68e0f0edfec5a3b5fb390587': {
-          _id: '68e0f0edfec5a3b5fb390587',
-          name: 'API Documentation Portal',
-          description: 'Create a comprehensive API documentation portal using modern documentation tools, featuring interactive API explorer, code examples in multiple languages (JavaScript, Python, Java, C#), authentication guides, rate limiting information, webhook documentation, version control, search functionality, and playground environment for testing API calls. Will serve as the central hub for developer resources.',
-          status: 'On Hold',
-          priority: 'Medium',
-          progress: 30,
-          deadline: '2026-01-15T00:00:00.000Z',
-          startDate: '2024-10-15T00:00:00.000Z',
-          endDate: '2026-01-15T00:00:00.000Z',
-          estimatedHours: 180,
-          actualHours: 54,
-          members: [
-            { _id: '4', user: { _id: '4', name: 'David Frontend', email: 'david.frontend@hotmail.com' }, role: 'Documentation Lead' },
-            { _id: '1', user: { _id: '1', name: 'Alice Developer', email: 'alice.dev@gmail.com' }, role: 'Backend Developer' }
-          ],
-          manager: { _id: 'manager1', name: 'John Manager', email: 'john.manager@gmail.com' },
-          tags: ['Documentation', 'Swagger', 'OpenAPI', 'Markdown', 'API', 'Developer Tools'],
-          comments: [
-            {
-              _id: 'comment1',
-              user: { name: 'John Manager', role: 'Manager' },
-              text: 'Putting this project on hold temporarily to prioritize the e-commerce platform. We\'ll resume once the main platform launches. Great initial work though!',
-              createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment2',
-              user: { name: 'David Frontend', role: 'Developer' },
-              text: 'Understood. I\'ve documented all progress so far. The OpenAPI spec is 30% complete and the portal framework is set up with Docusaurus. Ready to resume when needed.',
-              createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment3',
-              user: { name: 'Alice Developer', role: 'Developer' },
-              text: 'Created sample code snippets for the auth endpoints in 4 languages. These can be reused when we resume. Also set up the automated API reference generator.',
-              createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ],
-          budget: 35000,
-          spent: 10500,
-          createdAt: '2024-10-15T00:00:00.000Z'
-        },
-        'default': {
-          _id: projectId,
-          name: 'Mobile App Development',
-          description: 'Create a cross-platform mobile app using React Native with advanced features including real-time chat, push notifications, offline capabilities, biometric authentication, and social sharing. The app will integrate with Firebase for backend services, implement Redux for state management, and support both iOS and Android platforms with native performance.',
-          status: 'Ongoing',
-          priority: 'High',
-          progress: 48,
-          deadline: '2025-11-30T00:00:00.000Z',
-          startDate: '2024-09-15T00:00:00.000Z',
-          endDate: '2025-11-30T00:00:00.000Z',
-          estimatedHours: 380,
-          actualHours: 182,
-          members: [
-            { _id: '1', user: { _id: '1', name: 'Alice Developer', email: 'alice.dev@gmail.com' }, role: 'Mobile Developer' },
-            { _id: '4', user: { _id: '4', name: 'David Frontend', email: 'david.frontend@hotmail.com' }, role: 'Frontend Developer' },
-            { _id: '3', user: { _id: '3', name: 'Carol Tester', email: 'carol.test@yahoo.com' }, role: 'QA Tester' }
-          ],
-          manager: { _id: 'manager1', name: 'John Manager', email: 'john.manager@gmail.com' },
-          tags: ['React Native', 'Firebase', 'Socket.io', 'Redux', 'TypeScript', 'iOS', 'Android'],
-          comments: [
-            {
-              _id: 'comment1',
-              user: { name: 'John Manager', role: 'Manager' },
-              text: 'The authentication flow is working perfectly! Great job on implementing biometric login with Face ID and Touch ID. Let\'s move forward with the real-time chat features.',
-              createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment2',
-              user: { name: 'Alice Developer', role: 'Developer' },
-              text: 'Real-time chat is now functional with Socket.io. Added end-to-end encryption, file sharing up to 10MB, and typing indicators. Testing push notifications for iOS and Android.',
-              createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              _id: 'comment3',
-              user: { name: 'David Frontend', role: 'Developer' },
-              text: 'Offline mode implementation is complete using AsyncStorage. App can now sync data when connection is restored. Performance metrics showing 60fps consistently.',
-              createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-            }
-          ],
-          budget: 68000,
-          spent: 32640,
-          createdAt: '2024-09-15T00:00:00.000Z'
-        }
-      };
-      
-      const demoTasks = {
-        '68e0f0edfec5a3b5fb390575': [ // E-commerce Website tasks
-          {
-            _id: 'task1',
-            title: 'Product Catalog System',
-            description: 'Build comprehensive product catalog with search, filtering, and category management',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 80,
-            actualHours: 75,
-            dueDate: '2024-10-15T00:00:00.000Z',
-            completedAt: '2024-10-14T00:00:00.000Z'
-          },
-          {
-            _id: 'task2',
-            title: 'Shopping Cart & Checkout Flow',
-            description: 'Implement shopping cart functionality with secure checkout process and order summary',
-            status: 'In Progress',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 120,
-            actualHours: 85,
-            dueDate: '2025-11-01T00:00:00.000Z'
-          },
-          {
-            _id: 'task3',
-            title: 'Payment Gateway Integration',
-            description: 'Integrate Stripe and PayPal payment systems with comprehensive error handling',
-            status: 'In Progress',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 60,
-            actualHours: 35,
-            dueDate: '2025-11-10T00:00:00.000Z'
-          },
-          {
-            _id: 'task4',
-            title: 'Admin Dashboard Development',
-            description: 'Create comprehensive admin panel for order management, analytics, and inventory control',
-            status: 'To Do',
-            priority: 'Medium',
-            assignedTo: { name: 'Bob Designer', email: 'bob.design@outlook.com' },
-            estimatedHours: 100,
-            actualHours: 0,
-            dueDate: '2025-11-20T00:00:00.000Z'
-          },
-          {
-            _id: 'task5',
-            title: 'User Reviews & Ratings',
-            description: 'Implement product review system with star ratings and verified purchase badges',
-            status: 'To Do',
-            priority: 'Low',
-            assignedTo: { name: 'Carol Tester', email: 'carol.test@yahoo.com' },
-            estimatedHours: 45,
-            actualHours: 0,
-            dueDate: '2025-12-05T00:00:00.000Z'
-          }
-        ],
-        '68e0f0edfec5a3b5fb39057b': [ // Mobile App Development tasks
-          {
-            _id: 'task1',
-            title: 'Project Setup & Architecture',
-            description: 'Complete project requirements analysis and technical architecture design with React Native',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 40,
-            actualHours: 38,
-            dueDate: '2024-09-25T00:00:00.000Z',
-            completedAt: '2024-09-24T00:00:00.000Z'
-          },
-          {
-            _id: 'task2',
-            title: 'Biometric Authentication',
-            description: 'Implement Face ID and Touch ID authentication with fallback to PIN',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 50,
-            actualHours: 48,
-            dueDate: '2024-10-10T00:00:00.000Z',
-            completedAt: '2024-10-09T00:00:00.000Z'
-          },
-          {
-            _id: 'task3',
-            title: 'Real-time Chat System',
-            description: 'Implement chat functionality with Socket.io, encryption, and file sharing',
-            status: 'In Progress',
-            priority: 'High',
-            assignedTo: { name: 'David Frontend', email: 'david.frontend@hotmail.com' },
-            estimatedHours: 80,
-            actualHours: 52,
-            dueDate: '2025-11-20T00:00:00.000Z'
-          },
-          {
-            _id: 'task4',
-            title: 'Push Notifications',
-            description: 'Set up Firebase Cloud Messaging for iOS and Android push notifications',
-            status: 'In Progress',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 35,
-            actualHours: 18,
-            dueDate: '2025-11-15T00:00:00.000Z'
-          },
-          {
-            _id: 'task5',
-            title: 'Offline Data Sync',
-            description: 'Implement offline capabilities with AsyncStorage and automatic sync',
-            status: 'Done',
-            priority: 'Medium',
-            assignedTo: { name: 'David Frontend', email: 'david.frontend@hotmail.com' },
-            estimatedHours: 60,
-            actualHours: 58,
-            dueDate: '2024-10-30T00:00:00.000Z',
-            completedAt: '2024-10-29T00:00:00.000Z'
-          },
-          {
-            _id: 'task6',
-            title: 'Testing & QA',
-            description: 'Comprehensive testing including unit tests, integration tests, and user acceptance testing',
-            status: 'To Do',
-            priority: 'Medium',
-            assignedTo: { name: 'Carol Tester', email: 'carol.test@yahoo.com' },
-            estimatedHours: 55,
-            actualHours: 0,
-            dueDate: '2025-11-25T00:00:00.000Z'
-          }
-        ],
-        '68e0f0edfec5a3b5fb390581': [ // Company Website Redesign tasks
-          {
-            _id: 'task1',
-            title: 'UI/UX Design & Wireframes',
-            description: 'Create modern design system and interactive wireframes in Figma',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Bob Designer', email: 'bob.design@outlook.com' },
-            estimatedHours: 60,
-            actualHours: 58,
-            dueDate: '2024-08-15T00:00:00.000Z',
-            completedAt: '2024-08-14T00:00:00.000Z'
-          },
-          {
-            _id: 'task2',
-            title: 'Responsive Frontend Development',
-            description: 'Build responsive website with HTML5, CSS3, and modern JavaScript',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 85,
-            actualHours: 82,
-            dueDate: '2024-09-05T00:00:00.000Z',
-            completedAt: '2024-09-04T00:00:00.000Z'
-          },
-          {
-            _id: 'task3',
-            title: 'SEO Optimization',
-            description: 'Implement comprehensive SEO with meta tags, structured data, and performance optimization',
-            status: 'Done',
-            priority: 'Medium',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 35,
-            actualHours: 33,
-            dueDate: '2024-09-12T00:00:00.000Z',
-            completedAt: '2024-09-11T00:00:00.000Z'
-          },
-          {
-            _id: 'task4',
-            title: 'Accessibility Compliance',
-            description: 'Ensure WCAG 2.1 AA compliance with screen reader support and keyboard navigation',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Bob Designer', email: 'bob.design@outlook.com' },
-            estimatedHours: 40,
-            actualHours: 42,
-            dueDate: '2024-09-15T00:00:00.000Z',
-            completedAt: '2024-09-15T00:00:00.000Z'
-          },
-          {
-            _id: 'task5',
-            title: 'Quality Assurance & Testing',
-            description: 'Cross-browser testing, performance testing, and user acceptance testing',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Carol Tester', email: 'carol.test@yahoo.com' },
-            estimatedHours: 20,
-            actualHours: 20,
-            dueDate: '2024-09-20T00:00:00.000Z',
-            completedAt: '2024-09-19T00:00:00.000Z'
-          }
-        ],
-        '68e0f0edfec5a3b5fb390587': [ // API Documentation Portal tasks
-          {
-            _id: 'task1',
-            title: 'Documentation Framework Setup',
-            description: 'Set up Docusaurus framework and configure deployment pipeline',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'David Frontend', email: 'david.frontend@hotmail.com' },
-            estimatedHours: 25,
-            actualHours: 24,
-            dueDate: '2024-10-25T00:00:00.000Z',
-            completedAt: '2024-10-24T00:00:00.000Z'
-          },
-          {
-            _id: 'task2',
-            title: 'OpenAPI Specification',
-            description: 'Create comprehensive OpenAPI 3.0 specification for all API endpoints',
-            status: 'In Progress',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 50,
-            actualHours: 18,
-            dueDate: '2026-01-05T00:00:00.000Z'
-          },
-          {
-            _id: 'task3',
-            title: 'Code Examples',
-            description: 'Write code examples in JavaScript, Python, Java, and C# for all endpoints',
-            status: 'To Do',
-            priority: 'Medium',
-            assignedTo: { name: 'David Frontend', email: 'david.frontend@hotmail.com' },
-            estimatedHours: 60,
-            actualHours: 0,
-            dueDate: '2026-01-10T00:00:00.000Z'
-          },
-          {
-            _id: 'task4',
-            title: 'Interactive API Playground',
-            description: 'Build interactive API testing environment with authentication',
-            status: 'To Do',
-            priority: 'Low',
-            assignedTo: { name: 'David Frontend', email: 'david.frontend@hotmail.com' },
-            estimatedHours: 45,
-            actualHours: 0,
-            dueDate: '2026-01-15T00:00:00.000Z'
-          }
-        ],
-        'default': [ // Default tasks if project ID doesn't match
-          {
-            _id: 'task1',
-            title: 'Project Planning & Analysis',
-            description: 'Complete project requirements analysis and technical architecture design',
-            status: 'Done',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 40,
-            actualHours: 38,
-            dueDate: '2024-09-25T00:00:00.000Z',
-            completedAt: '2024-09-24T00:00:00.000Z'
-          },
-          {
-            _id: 'task2',
-            title: 'Core Development',
-            description: 'Develop core features including authentication, navigation, and basic UI components',
-            status: 'In Progress',
-            priority: 'High',
-            assignedTo: { name: 'Alice Developer', email: 'alice.dev@gmail.com' },
-            estimatedHours: 160,
-            actualHours: 96,
-            dueDate: '2025-11-15T00:00:00.000Z'
-          },
-          {
-            _id: 'task3',
-            title: 'Testing & Quality Assurance',
-            description: 'Comprehensive testing including unit tests, integration tests, and user acceptance testing',
-            status: 'To Do',
-            priority: 'Medium',
-            assignedTo: { name: 'Carol Tester', email: 'carol.test@yahoo.com' },
-            estimatedHours: 40,
-            actualHours: 0,
-            dueDate: '2025-11-25T00:00:00.000Z'
-          }
-        ]
-      };
-      
-      // Use specific demo data if available, otherwise use default
-      const selectedProject = demoProjects[projectId] || demoProjects['default'];
-      const selectedTasks = demoTasks[projectId] || demoTasks['default'];
-      
-      console.log('📊 Demo data selected for project:', selectedProject.name, '| Project ID:', projectId);
-      console.log('🎯 Using fallback?', !demoProjects[projectId]);
-      
-      setProject(selectedProject);
-      setTasks(selectedTasks);
-      
-    } catch (error) {
-      console.error('Error in fetchProjectDetails:', error);
-      setProject(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };  const fetchAnalytics = async () => {
-    try {
-      // Try real API first
-      try {
-        const { data } = await getProjectAnalytics(projectId);
-        setAnalytics(data);
-        setShowAnalytics(true);
-        return;
-      } catch (apiError) {
-        console.log('Analytics API failed, using demo data');
-      }
-      
-      // Fallback to realistic demo analytics
-      const demoAnalytics = {
-        taskDistribution: {
-          completed: 1,
-          inProgress: 2,
-          todo: 2,
-          total: 5
-        },
-        teamPerformance: [
-          { name: 'Alice Johnson', tasksCompleted: 8, hoursLogged: 156, efficiency: 95 },
-          { name: 'Bob Smith', tasksCompleted: 6, hoursLogged: 120, efficiency: 88 },
-          { name: 'Carol Davis', tasksCompleted: 4, hoursLogged: 85, efficiency: 92 },
-          { name: 'David Chen', tasksCompleted: 5, hoursLogged: 98, efficiency: 90 }
-        ],
-        timeTracking: {
-          estimatedHours: project?.estimatedHours || 320,
-          actualHours: project?.actualHours || 144,
-          remainingHours: (project?.estimatedHours || 320) - (project?.actualHours || 144),
-          efficiency: Math.round(((project?.estimatedHours || 320) / (project?.actualHours || 144)) * 100)
-        },
-        progressTrend: [
-          { week: 'Week 1', progress: 10 },
-          { week: 'Week 2', progress: 25 },
-          { week: 'Week 3', progress: 35 },
-          { week: 'Week 4', progress: 45 },
-          { week: 'Week 5', progress: 60 },
-          { week: 'Week 6', progress: 75 }
-        ],
-        milestones: [
-          { name: 'Requirements Analysis', completed: true, date: '2024-09-20' },
-          { name: 'UI/UX Design', completed: true, date: '2024-10-05' },
-          { name: 'Core Development', completed: false, date: '2024-11-15' },
-          { name: 'Testing Phase', completed: false, date: '2024-11-25' },
-          { name: 'Deployment', completed: false, date: '2024-12-01' }
-        ]
-      };
-      
-      setAnalytics(demoAnalytics);
-      setShowAnalytics(true);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-      alert('Error loading analytics');
-    }
-  };
+      const proj = await projectsApi.get(projectId);
+      let projTasks = Array.isArray(proj.tasks) ? proj.tasks : [];
+      if (!projTasks.length) { try { projTasks = await projectsApi.tasks(projectId); } catch {} }
+      setProject(proj);
+      setTasks(projTasks);
+    } catch (e) { setError(e.message || 'Failed to load project'); }
+    finally { setLoading(false); }
+  }
 
-  const handleAddComment = async (e) => {
+  async function loadAnalytics() {
+    try { const data = await projectsApi.analytics(projectId); setAnalytics(data); setShowAnalytics(true); }
+    catch (e) { setError(prev => prev || 'Failed to load analytics'); }
+  }
+
+  async function submitComment(e) {
     e.preventDefault();
-    if (!newComment.trim()) return;
-
+    if (!commentValue.trim()) return;
+    setCommentSubmitting(true);
     try {
-      setIsAddingComment(true);
-      await addProjectComment(projectId, newComment);
-      setNewComment('');
-      // Refresh project data to show new comment
-      await fetchProjectDetails();
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      alert('Error adding comment');
-    } finally {
-      setIsAddingComment(false);
-    }
-  };
+      const created = await projectsApi.comment(projectId, commentValue.trim());
+      setProject(p => ({ ...p, comments: [created, ...(p?.comments||[])] }));
+      setCommentValue('');
+    } catch (e) { alert(e.message || 'Failed to add comment'); }
+    finally { setCommentSubmitting(false); }
+  }
 
-  const getStatusIcon = (status) => {
+  function statusIcon(status) {
     switch (status) {
-      case 'Completed':
-        return <CheckCircle2 className="status-icon completed" />;
-      case 'Ongoing':
-        return <Play className="status-icon ongoing" />;
-      case 'On Hold':
-        return <Pause className="status-icon on-hold" />;
-      default:
-        return <AlertCircle className="status-icon" />;
+      case 'Completed': return <CheckCircle2 className="status-icon completed" />;
+      case 'Ongoing': return <Play className="status-icon ongoing" />;
+      case 'On Hold': return <Pause className="status-icon on-hold" />;
+      default: return <AlertCircle className="status-icon" />;
     }
-  };
-
-  const getPriorityIcon = (priority) => {
-    return <Flag className={`priority-icon priority-${priority?.toLowerCase()}`} />;
-  };
-
-  const isUserAssigned = () => {
-    return project?.members?.some(member => member.user?._id === user?.id || member.user?.id === user?.id);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="project-detail-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading project details...</p>
-      </div>
-    );
   }
 
-  if (!project) {
-    return (
-      <div className="project-detail-error">
-        <h2>Project not found</h2>
-        <button onClick={() => navigate('/projects')} className="btn-primary">
-          Back to Projects
-        </button>
-      </div>
-    );
-  }
+  if (loading) return <div className="project-detail-loading"><div className="loading-spinner"/>Loading project...</div>;
+  if (error) return <div className="project-detail-error"><p>Error: {error}</p><button onClick={load}>Retry</button></div>;
+  if (!project) return <div className="project-detail-error"><p>Project not found.</p></div>;
 
   return (
     <div className="project-detail-container">
-      {/* Header */}
       <div className="project-detail-header">
-        <button 
-          onClick={() => navigate('/projects')} 
-          className="back-btn"
-        >
-          <ArrowLeft size={20} />
-          Back to Projects
-        </button>
-        
+        <button onClick={() => navigate('/projects')} className="back-btn"><ArrowLeft size={18}/> Back</button>
         <div className="project-header-content">
           <div className="project-title-section">
             <h1 className="project-title">{project.name}</h1>
             <div className="project-badges">
-              <span className={`status-badge ${project.status.replace(' ', '-').toLowerCase()}`}>
-                {getStatusIcon(project.status)}
-                {project.status}
-              </span>
-              <span className={`priority-badge priority-${project.priority?.toLowerCase()}`}>
-                {getPriorityIcon(project.priority)}
-                {project.priority}
-              </span>
-              {isUserAssigned() && (
-                <span className="assigned-badge">
-                  <Users size={16} />
-                  You're assigned
-                </span>
-              )}
+              <span className={`status-badge ${project.status?.replace(/\s+/g,'-').toLowerCase()}`}>{statusIcon(project.status)}{project.status}</span>
+              <span className={`priority-badge priority-${project.priority?.toLowerCase()}`}> <Flag size={14}/> {project.priority}</span>
             </div>
-          </div>
-          
-          {isManager && (
-            <div className="project-actions">
-              <button 
-                onClick={() => navigate(`/projects/${projectId}/monitor`)}
-                className="action-btn monitor-btn"
-              >
-                <TrendingUp size={18} />
-                Monitor Progress
-              </button>
-              <button 
-                onClick={fetchAnalytics}
-                className="action-btn analytics-btn"
-              >
-                <BarChart3 size={18} />
-                Review Reports
-              </button>
-              <button 
-                onClick={() => navigate(`/projects/${projectId}/edit`)}
-                className="action-btn edit-btn"
-              >
-                <Edit3 size={18} />
-                Edit
-              </button>
-              <button 
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete this project?')) {
-                    deleteProject(projectId).then(() => navigate('/projects'));
-                  }
-                }}
-                className="action-btn delete-btn"
-              >
-                <Trash2 size={18} />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="project-detail-content">
-        {/* Project Info */}
-        <div className="project-info-section">
-          <div className="project-description">
-            <h3>Description</h3>
-            <p>{project.description || 'No description provided'}</p>
-          </div>
-
-          <div className="project-meta-grid">
-            <div className="meta-card">
-              <Calendar className="meta-icon" />
-              <div>
-                <h4>Deadline</h4>
-                <p>{project.deadline ? new Date(project.deadline).toLocaleDateString() : 'No deadline set'}</p>
-              </div>
-            </div>
-            
-            <div className="meta-card">
-              <Target className="meta-icon" />
-              <div>
-                <h4>Progress</h4>
-                <div className="progress-display">
-                  <div className="progress-bar-container">
-                    <div 
-                      className="progress-bar-fill"
-                      style={{ width: `${project.progress || 0}%` }}
-                    />
-                  </div>
-                  <span className="progress-text">{project.progress || 0}%</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="meta-card">
-              <Users className="meta-icon" />
-              <div>
-                <h4>Team Size</h4>
-                <p>{project.members?.length || 0} members</p>
-              </div>
-            </div>
-            
-            <div className="meta-card">
-              <Clock className="meta-icon" />
-              <div>
-                <h4>Tasks</h4>
-                <p>{tasks.length} total tasks</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Tags */}
-          {project.tags && project.tags.length > 0 && (
-            <div className="project-tags-section">
-              <h4>Tags</h4>
-              <div className="tags-container">
-                {project.tags.map((tag, index) => (
-                  <span key={index} className="tag">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Team Members */}
-        <div className="team-section">
-          <h3>Team Members</h3>
-          <div className="team-members-grid">
-            {project.members?.map(member => (
-              <div key={member.user?._id || member._id} className="team-member-card">
-                <div className="member-avatar">
-                  {(member.user?.name || member.name || '').charAt(0)}
-                </div>
-                <div className="member-info">
-                  <h4>{member.user?.name || member.name}</h4>
-                  <p className="member-role">{member.role}</p>
-                  <p className="member-email">{member.user?.email || member.email}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tasks Section */}
-        <div className="tasks-section">
-          <h3>Project Tasks ({tasks.length})</h3>
-          {tasks.length > 0 ? (
-            <div className="tasks-grid">
-              {tasks.map(task => (
-                <div key={task._id} className="task-card">
-                  <div className="task-header">
-                    <h4>{task.title}</h4>
-                    <span className={`task-status ${task.status.replace(' ', '-').toLowerCase()}`}>
-                      {task.status}
-                    </span>
-                  </div>
-                  <p className="task-description">{task.description}</p>
-                  <div className="task-meta">
-                    <span className="task-assignee">
-                      Assigned to: {task.assignedTo?.name || 'Unassigned'}
-                    </span>
-                    {task.dueDate && (
-                      <span className="task-due-date">
-                        Due: {new Date(task.dueDate).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="no-tasks">
-              <p>No tasks assigned to this project yet.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Comments Section */}
-        <div className="comments-section">
-          <h3>
-            <MessageCircle size={20} />
-            Comments ({project.comments?.length || 0})
-          </h3>
-          
-          {/* Add Comment Form */}
-          <form onSubmit={handleAddComment} className="add-comment-form">
-            <textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-              rows="3"
-              className="comment-textarea"
-            />
-            <button 
-              type="submit" 
-              disabled={isAddingComment || !newComment.trim()}
-              className="btn-primary"
-            >
-              {isAddingComment ? 'Adding...' : 'Add Comment'}
-            </button>
-          </form>
-
-          {/* Comments List */}
-          <div className="comments-list">
-            {project.comments?.map((comment, index) => (
-              <div key={index} className="comment-item">
-                <div className="comment-header">
-                  <div className="comment-author">
-                    <div className="author-avatar">
-                      {(comment.user?.name || '').charAt(0)}
-                    </div>
-                    <span className="author-name">{comment.user?.name}</span>
-                  </div>
-                  <span className="comment-date">
-                    {new Date(comment.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="comment-text">{comment.text}</p>
-              </div>
-            ))}
-            {(!project.comments || project.comments.length === 0) && (
-              <p className="no-comments">No comments yet. Be the first to comment!</p>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Analytics Modal */}
-      {showAnalytics && analytics && (
-        <div className="modal-backdrop" onClick={() => setShowAnalytics(false)}>
-          <div className="modal-content analytics-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>
-                <BarChart3 size={24} />
-                {project.name} - Analytics & Reports
-              </h2>
-              <button 
-                className="close-btn" 
-                onClick={() => setShowAnalytics(false)}
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="analytics-content">
-              <div className="analytics-grid">
-                <div className="analytics-card">
-                  <h4>Task Distribution</h4>
-                  <div className="task-stats">
-                    <div className="stat-item">
-                      <span className="stat-label">Total Tasks</span>
-                      <span className="stat-value">{analytics.totalTasks || tasks.length}</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">Completed</span>
-                      <span className="stat-value completed">{analytics.completedTasks || tasks.filter(t => t.status === 'Done').length}</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">In Progress</span>
-                      <span className="stat-value in-progress">{analytics.inProgressTasks || tasks.filter(t => t.status === 'In Progress').length}</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">To Do</span>
-                      <span className="stat-value todo">{analytics.todoTasks || tasks.filter(t => t.status === 'To Do').length}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="analytics-card">
-                  <h4>Time Tracking</h4>
-                  <div className="time-stats">
-                    <div className="stat-item">
-                      <span className="stat-label">Estimated Hours</span>
-                      <span className="stat-value">{analytics.estimatedHours || project.estimatedHours || 0}h</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">Actual Hours</span>
-                      <span className="stat-value">{analytics.actualHours || project.actualHours || 0}h</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">Remaining Hours</span>
-                      <span className="stat-value">{(analytics.estimatedHours || project.estimatedHours || 0) - (analytics.actualHours || project.actualHours || 0)}h</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-label">Efficiency</span>
-                      <span className="stat-value">{analytics.efficiency || Math.round(((project.estimatedHours || 1) / (project.actualHours || 1)) * 100)}%</span>
-                    </div>
-                  </div>
-                </div>
+      <div className="project-meta-grid">
+        <div className="meta-item"><Calendar size={16}/> Deadline: {project.deadline ? new Date(project.deadline).toLocaleDateString() : 'N/A'}</div>
+        <div className="meta-item"><Users size={16}/> Members: {project.members?.length || 0}</div>
+        <div className="meta-item"><Target size={16}/> Priority: {project.priority}</div>
+        <div className="meta-item"><Clock size={16}/> Updated: {project.updatedAt ? new Date(project.updatedAt).toLocaleString() : '-'}</div>
+      </div>
 
-                <div className="analytics-card">
-                  <h4>Team Performance</h4>
-                  <div className="team-performance-list">
-                    {(analytics.teamPerformance || [
-                      { name: 'Alice Developer', tasksCompleted: 8, hoursLogged: 156, efficiency: 95 },
-                      { name: 'Bob Designer', tasksCompleted: 6, hoursLogged: 120, efficiency: 88 }
-                    ]).map((member, idx) => (
-                      <div key={idx} className="performance-item">
-                        <div className="performance-name">{member.name}</div>
-                        <div className="performance-stats">
-                          <span>{member.tasksCompleted} tasks</span>
-                          <span>{member.hoursLogged}h logged</span>
-                          <span className={`efficiency ${member.efficiency >= 90 ? 'high' : 'medium'}`}>
-                            {member.efficiency}% efficiency
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+      <section className="project-section">
+        <h2>Description</h2>
+        <p>{project.description || 'No description provided.'}</p>
+      </section>
 
-                <div className="analytics-card">
-                  <h4>Milestones</h4>
-                  <div className="milestones-list">
-                    {(analytics.milestones || [
-                      { name: 'Requirements Analysis', completed: true, date: '2024-09-20' },
-                      { name: 'UI/UX Design', completed: true, date: '2024-10-05' },
-                      { name: 'Core Development', completed: false, date: '2024-11-15' },
-                      { name: 'Testing Phase', completed: false, date: '2024-11-25' }
-                    ]).map((milestone, idx) => (
-                      <div key={idx} className={`milestone-item ${milestone.completed ? 'completed' : 'pending'}`}>
-                        <CheckCircle2 size={18} />
-                        <div className="milestone-info">
-                          <span className="milestone-name">{milestone.name}</span>
-                          <span className="milestone-date">{new Date(milestone.date).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+      <section className="project-section">
+        <h2>Tasks ({tasks.length})</h2>
+        {tasks.length === 0 && <div className="empty">No tasks yet.</div>}
+        <div className="tasks-list">
+          {tasks.map(t => (
+            <div key={t._id} className={`task-card status-${t.status?.toLowerCase().replace(/\s+/g,'-')}`}> 
+              <div className="task-header">
+                <strong>{t.title}</strong>
+                <span className="status">{t.status}</span>
+              </div>
+              <div className="task-body">
+                <p>{t.description}</p>
+                <div className="meta-line">
+                  {t.priority && <span>Priority: {t.priority}</span>}
+                  {t.dueDate && <span>Due: {new Date(t.dueDate).toLocaleDateString()}</span>}
+                  {t.assignedTo && <span>Assignee: {t.assignedTo.name}</span>}
                 </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
-      )}
+      </section>
 
+      <section className="project-section comments-section">
+        <h2>Comments</h2>
+        <form onSubmit={submitComment} className="add-comment-form">
+          <textarea value={commentValue} onChange={e=>setCommentValue(e.target.value)} placeholder="Add a comment" />
+          <button disabled={commentSubmitting || !commentValue.trim()}>{commentSubmitting ? 'Posting...' : 'Post'}</button>
+        </form>
+        <div className="comments-list">
+          {(project.comments||[]).length === 0 && <div className="empty">No comments yet.</div>}
+          {(project.comments||[]).map(c => (
+            <div key={c._id || c.createdAt} className="comment-item">
+              <div className="comment-meta">{c.user?.name || 'User'} • {new Date(c.createdAt).toLocaleString()}</div>
+              <div className="comment-text">{c.text}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="project-section analytics-section">
+        <h2>Analytics</h2>
+        {!showAnalytics && <button className="btn-secondary" onClick={loadAnalytics}><BarChart3 size={16}/> Load Analytics</button>}
+        {showAnalytics && !analytics && <div>Loading analytics...</div>}
+        {analytics && (
+          <div className="analytics-grid">
+            <div className="metric"><strong>Total Tasks</strong><span>{analytics.totalTasks}</span></div>
+            <div className="metric"><strong>Completed</strong><span>{analytics.completedTasks}</span></div>
+            <div className="metric"><strong>In Progress</strong><span>{analytics.inProgressTasks}</span></div>
+            <div className="metric"><strong>To Do</strong><span>{analytics.todoTasks}</span></div>
+          </div>
+        )}
+      </section>
     </div>
   );
 };

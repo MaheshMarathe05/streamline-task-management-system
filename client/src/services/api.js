@@ -116,6 +116,7 @@ export const deleteTeam = (teamId) => api.delete(`/team/${teamId}`);
 
 // --- Reports API Calls ---
 export const getDashboardStats = () => api.get('/reports/dashboard-stats');
+export const getProjectStats = () => api.get('/reports/project-stats');
 
 // --- Notifications ---
 export const getNotificationPreferences = () => api.get('/notifications/preferences');
