@@ -353,6 +353,36 @@
   background-clip: text;
 }
 
+.stat-requests .stat-info h3 {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.stat-card.clickable:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.stat-card.clickable:active {
+  transform: translateY(-4px);
+}
+
+.stat-card.stat-requests::before {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
+}
+
+.stat-requests .stat-icon {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
+  color: #3b82f6;
+}
+
 .stat-info p {
   font-size: 0.9rem;
   color: var(--text-secondary);

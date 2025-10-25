@@ -98,7 +98,6 @@ export const getTasks = (projectId) => {
 export const createTask = (taskData) => api.post('/tasks', taskData);
 export const updateTask = (taskId, taskData) => api.put(`/tasks/${taskId}`, taskData);
 export const deleteTask = (taskId) => api.delete(`/tasks/${taskId}`);
-export const submitTaskReport = (taskId, reportData) => api.post(`/tasks/${taskId}/report`, reportData);
 
 // --- TEAM API CALLS (Manager Only) ---
 export const getTeamMembers = () => api.get('/team');
@@ -164,6 +163,19 @@ export const getNotifications = () => api.get('/notifications');
 export const markNotificationAsRead = (notificationId) => api.patch(`/notifications/${notificationId}/read`);
 export const markAllNotificationsAsRead = () => api.put('/notifications/read-all');
 export const clearAllNotifications = () => api.delete('/notifications/clear');
+
+// --- STATUS CHANGE REQUESTS ---
+export const createStatusRequest = (data) => api.post('/status-requests', data);
+export const getStatusRequests = (params = {}) => api.get('/status-requests', { params });
+export const reviewStatusRequest = (requestId, action, comment) => api.put(`/status-requests/${requestId}`, { action, comment });
+export const cancelStatusRequest = (requestId) => api.delete(`/status-requests/${requestId}`);
+
+// --- TASK REPORTS ---
+export const submitTaskReport = (data) => api.post('/task-reports', data);
+export const getTaskReports = (params = {}) => api.get('/task-reports', { params });
+export const reviewTaskReport = (reportId, comment) => api.put(`/task-reports/${reportId}/review`, { comment });
+export const acknowledgeTaskReport = (reportId) => api.put(`/task-reports/${reportId}/acknowledge`);
+export const deleteTaskReport = (reportId) => api.delete(`/task-reports/${reportId}`);
 
 // Simple connectivity check
 export const healthCheck = () => api.get('/health');

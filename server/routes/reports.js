@@ -136,12 +136,39 @@ router.get('/project-stats', protect, async (req, res) => {
         console.log('   Formula: (' + completedProjectsCount + ' / ' + totalProjects + ') × 100');
         console.log('   Result:', completionRate + '%');
 
-        // 5. Get recent projects (last 5)
-        const recentProjects = await Project.find(projectMatch)
+        // 5. Get recent projects (last 5) with calculated progress
+        const recentProjectsRaw = await Project.find(projectMatch)
             .sort({ updatedAt: -1 })
             .limit(5)
             .populate('manager', 'name')
-            .select('name status priority startDate endDate progress');
+            .select('name status priority startDate endDate');
+        
+        // Calculate progress for each recent project
+        const recentProjects = await Promise.all(
+            recentProjectsRaw.map(async (project) => {
+                const projectObj = project.toObject();
+                
+                // Calculate progress
+                const totalTasks = await Task.countDocuments({ project: project._id });
+                if (totalTasks === 0) {
+                    projectObj.progress = 0;
+                    projectObj.totalTasks = 0;
+                    projectObj.completedTasks = 0;
+                } else {
+                    const completedTasks = await Task.countDocuments({ project: project._id, status: 'Done' });
+                    projectObj.progress = Math.round((completedTasks / totalTasks) * 100);
+                    projectObj.totalTasks = totalTasks;
+                    projectObj.completedTasks = completedTasks;
+                }
+                
+                return projectObj;
+            })
+        );
+        
+        console.log('📊 Recent Projects with Progress:');
+        recentProjects.forEach(p => {
+            console.log(`   "${p.name}": ${p.progress}% (${p.completedTasks}/${p.totalTasks} tasks)`);
+        });
 
         // 6. Get project-wise task distribution
         console.log('🔍 Building Project Task Stats for:', req.user.email, '| Is Manager:', isManager);

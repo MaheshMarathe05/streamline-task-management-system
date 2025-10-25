@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { getDashboardStats, getProjectStats } from '../services/api';
+import { getDashboardStats, getProjectStats, updateProject, getStatusRequests } from '../services/api';
 import { 
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
     PieChart, Pie, Cell, LineChart, Line, Legend, CartesianGrid
@@ -47,6 +47,7 @@ const DashboardPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [backupCodesWarning, setBackupCodesWarning] = useState(null);
     const [apiError, setApiError] = useState(null);
+    const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     
     // Modal states
     const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
@@ -102,6 +103,20 @@ const DashboardPage = () => {
                     console.log('📊 Recent Projects:', response.data.recentProjects?.length);
                     console.log('📊 Project Task Stats:', response.data.projectTaskStats);
                     console.log('📊 Project Task Stats Length:', response.data.projectTaskStats?.length);
+                    
+                    // 🔍 DEBUG: Log each recent project's progress field
+                    console.log('🔍 CHECKING RECENT PROJECTS PROGRESS:');
+                    response.data.recentProjects?.forEach((proj, idx) => {
+                        console.log(`  Project #${idx + 1}: "${proj.name}"`, {
+                            progress: proj.progress,
+                            progressData: proj.progressData,
+                            totalTasks: proj.totalTasks,
+                            completedTasks: proj.completedTasks,
+                            hasProgressField: 'progress' in proj,
+                            hasProgressDataField: 'progressData' in proj
+                        });
+                    });
+                    
                     setApiError(null); // Clear any previous errors
                 } else {
                     console.error('❌ Invalid response structure:', response);
@@ -121,7 +136,22 @@ const DashboardPage = () => {
             }
         };
         
-        Promise.all([fetchStats(), fetchProjectStats()]).finally(() => {
+        const fetchPendingRequests = async () => {
+            if (!isManager) return;
+            try {
+                console.log('⏳ Fetching pending status requests...');
+                const response = await getStatusRequests({ status: 'pending' });
+                const data = response.data || response;
+                const count = Array.isArray(data) ? data.length : 0;
+                setPendingRequestsCount(count);
+                console.log('✅ Pending requests count:', count);
+            } catch (error) {
+                console.error('❌ Could not fetch pending requests:', error);
+                setPendingRequestsCount(0);
+            }
+        };
+        
+        Promise.all([fetchStats(), fetchProjectStats(), fetchPendingRequests()]).finally(() => {
             setIsLoading(false);
         });
         
@@ -154,6 +184,29 @@ const DashboardPage = () => {
             setProjectStats(data);
         } catch (error) {
             console.error("Error refreshing project stats:", error);
+        }
+    };
+
+    // Quick update project status (small inline helper for managers)
+    const quickUpdateProjectStatus = async (projectId) => {
+        try {
+            const newStatus = window.prompt('Enter new project status (Ongoing, Completed, On Hold):');
+            if (!newStatus) return; // cancelled
+
+            const normalized = newStatus.trim();
+            const allowed = ['Ongoing', 'Completed', 'On Hold'];
+            if (!allowed.includes(normalized)) {
+                alert('Invalid status. Please enter one of: Ongoing, Completed, On Hold');
+                return;
+            }
+
+            await updateProject(projectId, { status: normalized });
+            // Refresh stats
+            const { data } = await getProjectStats();
+            setProjectStats(data);
+        } catch (error) {
+            console.error('Error updating project status:', error);
+            alert('Failed to update project status. See console for details.');
         }
     };
 
@@ -288,6 +341,26 @@ const DashboardPage = () => {
                             <span>Needs attention</span>
                         </div>
                     </div>
+
+                    {isManager && (
+                        <div 
+                            className="stat-card stat-requests clickable" 
+                            onClick={() => navigate('/status-requests')}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <div className="stat-icon">
+                                <Clock size={24} />
+                            </div>
+                            <div className="stat-info">
+                                <h3>{pendingRequestsCount}</h3>
+                                <p>Pending Requests</p>
+                            </div>
+                            <div className="stat-trend">
+                                <ArrowUpRight size={16} />
+                                <span>Review now</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Main Content Grid */}
@@ -319,7 +392,7 @@ const DashboardPage = () => {
                             
                             {/* Recent Projects */}
                             <div className="recent-projects">
-                                {(projectStats.recentProjects || []).slice(0, 3).map(project => (
+                                {(projectStats.recentProjects || []).slice(0, 4).map(project => (
                                     <div 
                                         key={project._id} 
                                         className="project-card"
@@ -391,6 +464,19 @@ const DashboardPage = () => {
                                                     Edit
                                                 </button>
                                             )}
+                                                {isManager && (
+                                                    <button
+                                                        className="project-action-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            quickUpdateProjectStatus(project._id);
+                                                        }}
+                                                        title="Quick Status"
+                                                    >
+                                                        <CheckCircle2 size={16} />
+                                                        Status
+                                                    </button>
+                                                )}
                                         </div>
                                     </div>
                                 ))}
@@ -439,6 +525,37 @@ const DashboardPage = () => {
                                         <BarChart3 size={48} strokeWidth={1.5} />
                                         <p>No project task data available</p>
                                         <span>Tasks will appear here once projects have assigned tasks</span>
+                                        <div className="empty-actions">
+                                            <button
+                                                className="action-btn"
+                                                onClick={async () => {
+                                                    setIsLoading(true);
+                                                    try {
+                                                        const { data } = await getProjectStats();
+                                                        setProjectStats(data);
+                                                    } catch (err) {
+                                                        console.error('Failed to refresh project stats', err);
+                                                        setApiError('Failed to refresh project stats');
+                                                    } finally {
+                                                        setIsLoading(false);
+                                                    }
+                                                }}
+                                            >
+                                                Refresh
+                                            </button>
+                                            {isManager && (
+                                                <button
+                                                    className="action-btn action-create"
+                                                    onClick={() => setShowCreateProjectModal(true)}
+                                                >
+                                                    <Plus size={12} />
+                                                    Create Project
+                                                </button>
+                                            )}
+                                            <button className="action-btn" onClick={() => navigate('/projects')}>
+                                                View Projects
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>

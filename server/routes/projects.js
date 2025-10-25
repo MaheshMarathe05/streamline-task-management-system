@@ -93,6 +93,10 @@ router.get('/', protect, async (req, res) => {
         const progressData = await getProjectProgress(project._id);
         const projectObj = project.toObject();
         projectObj.progressData = progressData;
+        // Also add progress directly for easy frontend access
+        projectObj.progress = progressData.progress;
+        projectObj.totalTasks = progressData.totalTasks;
+        projectObj.completedTasks = progressData.completedTasks;
         
         // Add tasks data
         const tasks = await Task.find({ project: project._id })
@@ -140,6 +144,10 @@ router.get('/:id', protect, async (req, res) => {
     const progressData = await getProjectProgress(project._id);
     const projectObj = project.toObject();
     projectObj.progressData = progressData;
+    // Also add progress directly for easy frontend access
+    projectObj.progress = progressData.progress;
+    projectObj.totalTasks = progressData.totalTasks;
+    projectObj.completedTasks = progressData.completedTasks;
     
     // Add tasks data
     const tasks = await Task.find({ project: project._id })

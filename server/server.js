@@ -26,6 +26,8 @@ import enhancedRecoveryRoutes from "./routes/enhancedRecovery.js";
 import notificationRoutes from './routes/notifications.js';
 import securityRoutes from './routes/security.js';
 import twoFARoutes from './routes/2fa.js';
+import statusRequestRoutes from './routes/statusRequests.js';
+import taskReportRoutes from './routes/taskReports.js';
 
 
 const app = express();
@@ -95,6 +97,8 @@ app.use("/api/enhanced-recovery", enhancedRecoveryRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/2fa', twoFARoutes);
+app.use('/api/status-requests', statusRequestRoutes);
+app.use('/api/task-reports', taskReportRoutes);
 
 // --- Start Server ---
 const PORT = process.env.PORT || 5000;

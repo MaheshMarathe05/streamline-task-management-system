@@ -34,12 +34,15 @@ const SubmitReport = ({ task, onSubmit, onClose }) => {
     setError('');
 
     try {
-      // Submit report
+      // Submit report with new API
       const report = {
         taskId: task?._id,
-        taskTitle: task?.title || 'General Report',
-        ...reportData,
-        submittedAt: new Date().toISOString()
+        workAccomplished: reportData.workAccomplished,
+        challengesFaced: reportData.challengesFaced,
+        timeSpent: parseFloat(reportData.timeSpent) || 0,
+        completionPercentage: parseInt(reportData.estimatedCompletion) || 0,
+        nextSteps: reportData.nextSteps,
+        blockers: reportData.blockers
       };
 
       await onSubmit(report);
