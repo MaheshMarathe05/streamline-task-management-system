@@ -489,37 +489,94 @@ const DashboardPage = () => {
                                 <h2>Project Task Statistics</h2>
                                 <p className="section-subtitle">Task distribution across projects</p>
                             </div>
-                            <div className="project-task-stats">
+                            <div className="project-task-stats-wrapper">
                                 {(projectStats.projectTaskStats || []).length > 0 ? (
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart data={(projectStats.projectTaskStats || []).slice(0, 5)}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
-                                            <XAxis 
-                                                dataKey="projectName" 
-                                                stroke="var(--text-secondary)" 
-                                                fontSize={12}
-                                                angle={-15}
-                                                textAnchor="end"
-                                                height={80}
-                                            />
-                                            <YAxis stroke="var(--text-secondary)" fontSize={12} />
-                                            <Tooltip 
-                                                contentStyle={{
-                                                    backgroundColor: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '8px',
-                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                                                }}
-                                            />
-                                            <Legend 
-                                                wrapperStyle={{ paddingTop: '20px' }}
-                                                iconType="circle"
-                                            />
-                                            <Bar dataKey="completedTasks" fill="#22c55e" name="Completed" radius={[4, 4, 0, 0]} />
-                                            <Bar dataKey="inProgressTasks" fill="#0ea5e9" name="In Progress" radius={[4, 4, 0, 0]} />
-                                            <Bar dataKey="todoTasks" fill="#f97316" name="To Do" radius={[4, 4, 0, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
+                                    <div className="project-cards-grid">
+                                        {(projectStats.projectTaskStats || []).map((project, index) => {
+                                            const totalTasks = (project.completedTasks || 0) + (project.inProgressTasks || 0) + (project.todoTasks || 0);
+                                            const completionPercentage = totalTasks > 0 ? Math.round((project.completedTasks / totalTasks) * 100) : 0;
+                                            
+                                            return (
+                                                <div key={index} className="project-stats-card">
+                                                    <div className="project-card-header">
+                                                        <div className="project-card-icon">
+                                                            <FolderKanban size={20} />
+                                                        </div>
+                                                        <h3 className="project-card-title">{project.projectName}</h3>
+                                                    </div>
+                                                    
+                                                    <div className="project-card-stats">
+                                                        <div className="total-tasks-count">
+                                                            <span className="count-number">{totalTasks}</span>
+                                                            <span className="count-label">Total Tasks</span>
+                                                        </div>
+                                                        
+                                                        <div className="completion-circle">
+                                                            <svg width="80" height="80" viewBox="0 0 80 80">
+                                                                <circle
+                                                                    cx="40"
+                                                                    cy="40"
+                                                                    r="32"
+                                                                    fill="none"
+                                                                    stroke="rgba(0,0,0,0.05)"
+                                                                    strokeWidth="8"
+                                                                />
+                                                                <circle
+                                                                    cx="40"
+                                                                    cy="40"
+                                                                    r="32"
+                                                                    fill="none"
+                                                                    stroke="#22c55e"
+                                                                    strokeWidth="8"
+                                                                    strokeDasharray={`${(completionPercentage / 100) * 201} 201`}
+                                                                    strokeLinecap="round"
+                                                                    transform="rotate(-90 40 40)"
+                                                                />
+                                                                <text x="40" y="40" textAnchor="middle" dy="7" fontSize="18" fontWeight="600" fill="#22c55e">
+                                                                    {completionPercentage}%
+                                                                </text>
+                                                            </svg>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="project-card-breakdown">
+                                                        <div className="task-breakdown-item completed">
+                                                            <div className="breakdown-dot"></div>
+                                                            <span className="breakdown-label">Completed</span>
+                                                            <span className="breakdown-count">{project.completedTasks || 0}</span>
+                                                        </div>
+                                                        <div className="task-breakdown-item in-progress">
+                                                            <div className="breakdown-dot"></div>
+                                                            <span className="breakdown-label">In Progress</span>
+                                                            <span className="breakdown-count">{project.inProgressTasks || 0}</span>
+                                                        </div>
+                                                        <div className="task-breakdown-item todo">
+                                                            <div className="breakdown-dot"></div>
+                                                            <span className="breakdown-label">To Do</span>
+                                                            <span className="breakdown-count">{project.todoTasks || 0}</span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="project-card-progress-bar">
+                                                        <div className="progress-bar-container">
+                                                            <div 
+                                                                className="progress-segment completed" 
+                                                                style={{ width: `${totalTasks > 0 ? (project.completedTasks / totalTasks) * 100 : 0}%` }}
+                                                            ></div>
+                                                            <div 
+                                                                className="progress-segment in-progress" 
+                                                                style={{ width: `${totalTasks > 0 ? (project.inProgressTasks / totalTasks) * 100 : 0}%` }}
+                                                            ></div>
+                                                            <div 
+                                                                className="progress-segment todo" 
+                                                                style={{ width: `${totalTasks > 0 ? (project.todoTasks / totalTasks) * 100 : 0}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 ) : (
                                     <div className="empty-chart-state">
                                         <BarChart3 size={48} strokeWidth={1.5} />
