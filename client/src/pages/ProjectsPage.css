@@ -525,6 +525,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  color: var(--text-primary);
 }
 
 .close-btn {
@@ -556,7 +557,9 @@
 .modal-content .input-group label { 
   margin-bottom: 0.5rem; 
   font-weight: 500; 
-  display: block; 
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
 .modal-content input, 
@@ -566,11 +569,23 @@
   padding: 0.75rem; 
   border-radius: 8px;
   border: 1px solid var(--border-color); 
-  background: var(--bg-primary);
-  color: var(--text-primary); 
+  background: #ffffff;
+  color: #1e293b;
   box-sizing: border-box;
   font-size: 1rem;
   transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.modal-content input::placeholder,
+.modal-content textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.modal-content select option {
+  background: #ffffff;
+  color: #1e293b;
+  padding: 0.5rem;
 }
 
 .modal-content input:focus,

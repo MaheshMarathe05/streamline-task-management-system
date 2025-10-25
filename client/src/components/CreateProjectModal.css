@@ -10,32 +10,75 @@
   z-index: 1000;
 }
 .modal-content {
-  background: #2A2F45; /* var(--bg-secondary) */
+  background: #ffffff;
   padding: 2rem;
   border-radius: 12px;
   width: 100%;
   max-width: 500px;
-  border: 1px solid #383E5E; /* var(--border-color) */
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 30px -5px rgba(0, 0, 0, 0.15);
 }
 .modal-title {
   font-size: 1.5rem;
   margin: 0 0 1.5rem;
-  color: #FFFFFF; /* var(--text-primary) */
+  color: #0f172a;
 }
 .modal-content .input-group { margin-bottom: 1rem; text-align: left; }
-.modal-content .input-group label { margin-bottom: 0.5rem; font-weight: 500; color: #A3AED0; display: block; }
+.modal-content .input-group label { 
+  margin-bottom: 0.5rem; 
+  font-weight: 500; 
+  color: #64748b; 
+  display: block; 
+  font-size: 0.875rem;
+}
 .modal-content input, .modal-content textarea, .modal-content select {
     width: 100%;
     padding: 0.75rem;
     border-radius: 8px;
-    border: 1px solid #383E5E;
-    background: #1A1D2E;
-    color: #FFFFFF;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #1e293b;
     box-sizing: border-box;
     font-size: 1rem;
 }
+.modal-content input::placeholder,
+.modal-content textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+.modal-content select option {
+  background: #ffffff;
+  color: #1e293b;
+  padding: 0.5rem;
+}
 .modal-content select[multiple] { height: 120px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
-.btn-secondary { background: #383E5E; color: #FFFFFF; padding: 0.75rem 1.25rem; border: none; }
-.btn-primary { background: var(--accent); color: #FFFFFF; padding: 0.75rem 1.25rem; border: none; }
-.error-message { color: #ef4444; }
+.btn-secondary { 
+  background: #f1f5f9; 
+  color: #334155; 
+  padding: 0.75rem 1.25rem; 
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+.btn-primary { 
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  color: #FFFFFF; 
+  padding: 0.75rem 1.25rem; 
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+.error-message { color: #ef4444; font-size: 0.875rem; margin-top: 0.5rem; }
