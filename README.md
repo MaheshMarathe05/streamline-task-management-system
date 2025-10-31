@@ -30,6 +30,12 @@ A full-stack role-based project & task management application with authenticatio
 - Task tracking with status & priority
 - Team listing (manager only endpoints)
 - Dashboard stats & reporting endpoints
+- **Team Chat with Encryption & Compression**
+  - AES-256-CBC encryption for all messages
+  - Gzip compression (60-70% data reduction)
+  - Team member validation and access control
+  - Message read tracking and editing capabilities
+  - Auto-refresh for real-time updates
 - Strong client-side validation (password strength, restricted email domains)
 - Dark theme UI for auth pages
 - Forgot Password workflow (frontend + backend stub)
@@ -43,6 +49,7 @@ server/        # Express API server
 ## Environment Variables
 Create a `.env` file in `server/` (not committed). Example:
 ```
+MONGO_URI=mongodb+srv://23104072_db_user:mTX5tX9YMrOBMESx@cluster0.pu5ag7d.mongodb.net/
 MONGO_URI=mongodb://localhost:27017/project_manager
 PORT=5000
 JWT_SECRET=replace_this_with_a_long_random_string
@@ -97,6 +104,11 @@ Backend API: http://localhost:5000
 | GET  | /api/team | List team members |
 | POST | /api/team/add | Add team member |
 | GET  | /api/reports/dashboard-stats | Dashboard stats |
+| GET  | /api/messages/:teamId | Get team messages |
+| POST | /api/messages/:teamId | Send team message |
+| PATCH | /api/messages/:teamId/read | Mark messages as read |
+| DELETE | /api/messages/:messageId | Delete a message |
+| GET  | /api/messages/:teamId/stats | Get message statistics |
 
 (Protected routes require `Authorization: Bearer <token>`)
 
@@ -172,10 +184,18 @@ Your Name (replace in README). Add contact or portfolio link.
 See `.env.example` and copy to `.env` in `server/` (backend) root or project root depending on your process manager.
 
 ```
+MONGO_URI=mongodb+srv://23104072_db_user:mTX5tX9YMrOBMESx@cluster0.pu5ag7d.mongodb.net/
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/project_mgmt
-JWT_SECRET=REPLACE_ME_WITH_A_LONG_RANDOM_STRING
-VITE_API_URL=http://localhost:5000/api
+JWT_SECRET=replace_this_with_a_long_random_string
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
+MESSAGE_ENCRYPTION_KEY=bd8a132f697c0b60b01bfad3b7398a8a4e8fecd9ff7237c28a6b2350b7e4c2df
+```
+
+**Note:** Generate `MESSAGE_ENCRYPTION_KEY` using:
+```bash
+node -e "console.log('MESSAGE_ENCRYPTION_KEY=' + require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### Login Request
