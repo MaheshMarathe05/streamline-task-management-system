@@ -69,13 +69,23 @@ router.get('/:teamId', protect, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
+    console.log('Team details:', { 
+      teamName: team.name, 
+      manager: team.manager,
+      members: team.members,
+      currentUser: req.user._id 
+    });
+
+    // Check if user is manager or a member of the team
+    const isManager = team.manager.toString() === req.user._id.toString();
     const isMember = team.members.some(m => m.toString() === req.user._id.toString());
-    if (!isMember) {
-      console.log('❌ User not a member of team:', req.user._id, teamId);
+    
+    if (!isManager && !isMember) {
+      console.log('❌ User not a member or manager of team:', req.user._id, teamId);
       return res.status(403).json({ success: false, error: 'Not a member of this team' });
     }
 
-    console.log('✅ User is team member, fetching messages...');
+    console.log('✅ User is team', isManager ? 'manager' : 'member', '- fetching messages...');
 
     // Fetch messages
     const messages = await Message.find({
@@ -137,9 +147,12 @@ router.post('/:teamId', protect, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
+    // Check if user is manager or a member of the team
+    const isManager = team.manager.toString() === req.user._id.toString();
     const isMember = team.members.some(m => m.toString() === req.user._id.toString());
-    if (!isMember) {
-      console.log('❌ User not a member of team');
+    
+    if (!isManager && !isMember) {
+      console.log('❌ User not a member or manager of team');
       return res.status(403).json({ success: false, error: 'Not a member of this team' });
     }
 
@@ -243,8 +256,11 @@ router.get('/:teamId/stats', protect, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Team not found' });
     }
 
+    // Check if user is manager or a member of the team
+    const isManager = team.manager.toString() === req.user._id.toString();
     const isMember = team.members.some(m => m.toString() === req.user._id.toString());
-    if (!isMember) {
+    
+    if (!isManager && !isMember) {
       return res.status(403).json({ success: false, error: 'Not a member of this team' });
     }
 
