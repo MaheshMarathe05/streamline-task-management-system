@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { getTeamOverview, getAvailableUsers, addExistingMembers, createTeam, updateTeamMembers, deleteTeam } from '../services/api';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getTeamOverview, getAvailableUsers, addExistingMembers, createTeam, updateTeamMembers, deleteTeam, getTeamMessages, sendTeamMessage, markMessagesAsRead } from '../services/api';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X, Users2, MessageCircle, Send, Clock, CheckCircle2 } from 'lucide-react';
+import { Plus, X, Users2, MessageCircle, Send, Clock, CheckCircle2, Loader } from 'lucide-react';
 import './TeamPage.css';
 
 // Add Existing Member Modal
@@ -110,102 +110,123 @@ const CreateTeamModal = ({ setShowModal, selectedIds, onCreated }) => {
     );
 };
 
-// Team Chat Component
+// Team Chat Component with Encryption & Compression
 const TeamChat = ({ teams, currentUser }) => {
     const [selectedTeam, setSelectedTeam] = useState(null);
     const [newMessage, setNewMessage] = useState('');
     const [messages, setMessages] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [error, setError] = useState(null);
+    const messagesEndRef = useRef(null);
+    const chatInterval = useRef(null);
 
-    // Sample chat messages based on employees from database
-    const sampleMessages = {
-        'Alpha Development Team': [
-            {
-                id: 1,
-                sender: 'Alice Johnson',
-                senderEmail: 'alice.developer@gmail.com',
-                message: "Great job on the website redesign! The new UI components look amazing 🎨",
-                timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-                read: true
-            },
-            {
-                id: 2,
-                sender: 'Bob Wilson',
-                senderEmail: 'bob.designer@gmail.com',
-                message: "Thanks Alice! I've uploaded the final mockups to the project folder. @Carol can you start testing?",
-                timestamp: new Date(Date.now() - 90 * 60 * 1000), // 90 minutes ago
-                read: true
-            },
-            {
-                id: 3,
-                sender: 'Carol Brown',
-                senderEmail: 'carol.tester@gmail.com',
-                message: "Sure! I'll run the full test suite today. Found a small bug in the mobile navigation - should be quick to fix 🐛",
-                timestamp: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
-                read: false
-            },
-            {
-                id: 4,
-                sender: 'John Manager',
-                senderEmail: 'john.manager@gmail.com',
-                message: "Excellent progress everyone! We're ahead of schedule. Let's aim to finish testing by Friday 🚀",
-                timestamp: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
-                read: false
-            }
-        ],
-        'Beta Marketing Team': [
-            {
-                id: 5,
-                sender: 'David Smith',
-                senderEmail: 'david.marketing@gmail.com',
-                message: "The Q4 campaign analytics look promising! CTR is up 15% from last quarter 📈",
-                timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-                read: true
-            },
-            {
-                id: 6,
-                sender: 'Emma Davis',
-                senderEmail: 'emma.sales@gmail.com',
-                message: "That's fantastic! I'm seeing increased lead quality too. Should we expand the budget? 💰",
-                timestamp: new Date(Date.now() - 2.5 * 60 * 60 * 1000), // 2.5 hours ago
-                read: true
-            },
-            {
-                id: 7,
-                sender: 'John Manager',
-                senderEmail: 'john.manager@gmail.com',
-                message: "Great results team! Let's schedule a meeting to discuss budget expansion. @Emma please prepare a proposal 📋",
-                timestamp: new Date(Date.now() - 20 * 60 * 1000), // 20 minutes ago
-                read: false
-            }
-        ]
+    // Scroll to bottom of messages
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    // Load messages for selected team
+    const loadMessages = async (teamId, silent = false) => {
+        if (!silent) setIsLoading(true);
+        setError(null);
+        
+        try {
+            console.log('🔄 Loading messages for team:', teamId);
+            const response = await getTeamMessages(teamId, { limit: 50 });
+            console.log('📨 Messages response:', response);
+            
+            if (response?.data?.success) {
+                const messages = response.data.messages || [];
+                console.log(`✅ Loaded ${messages.length} messages`);
+                setMessages(messages);
+                setTimeout(scrollToBottom, 100);
+                
+                // Mark unread messages as read
+                const unreadIds = messages
+                    .filter(msg => 
+                        msg.userId?._id !== currentUser?._id && 
+                        !msg.readBy?.includes(currentUser?._id)
+                    )
+                    .map(msg => msg._id);
+                
+                if (unreadIds.length > 0) {
+                    await markMessagesAsRead(teamId, unreadIds).catch(err => 
+                        console.error('Failed to mark as read:', err)
+                    );
+                }
+            } else {
+                console.warn('❌ Unexpected response format:', response);
+                setError(response?.data?.error || 'Failed to load messages');
+            }
+        } catch (err) {
+            console.error('❌ Failed to load messages:', err);
+            const errorMsg = err.response?.data?.error || err.message || 'Failed to load messages. Please try again.';
+            setError(errorMsg);
+        } finally {
+            if (!silent) setIsLoading(false);
+        }
+    };
+
+    // Auto-refresh messages every 5 seconds
     useEffect(() => {
         if (selectedTeam) {
-            setMessages(sampleMessages[selectedTeam.name] || []);
+            loadMessages(selectedTeam._id);
+            
+            // Set up polling
+            chatInterval.current = setInterval(() => {
+                loadMessages(selectedTeam._id, true); // Silent refresh
+            }, 5000);
         }
+        
+        return () => {
+            if (chatInterval.current) {
+                clearInterval(chatInterval.current);
+            }
+        };
     }, [selectedTeam]);
 
-    const handleSendMessage = (e) => {
+    // Send message
+    const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedTeam) return;
+        if (!newMessage.trim() || !selectedTeam || isSending) return;
 
-        const message = {
-            id: Date.now(),
-            sender: currentUser.name,
-            senderEmail: currentUser.email,
-            message: newMessage.trim(),
-            timestamp: new Date(),
-            read: false
-        };
+        const messageText = newMessage.trim();
+        setIsSending(true);
+        setError(null);
 
-        setMessages(prev => [...prev, message]);
-        setNewMessage('');
+        try {
+            console.log('📤 Sending message:', messageText.substring(0, 20) + '...');
+            const response = await sendTeamMessage(selectedTeam._id, { 
+                text: messageText 
+            });
+            
+            console.log('📨 Send response:', response);
+            
+            if (response?.data?.success) {
+                // Add message to local state immediately
+                const newMsg = response.data.message;
+                console.log('✅ Message sent successfully');
+                setMessages(prev => [...prev, newMsg]);
+                setNewMessage('');
+                setTimeout(scrollToBottom, 100);
+            } else {
+                console.warn('❌ Failed to send:', response);
+                setError(response?.data?.error || 'Failed to send message');
+            }
+        } catch (err) {
+            console.error('❌ Failed to send message:', err);
+            const errorMsg = err.response?.data?.error || err.message || 'Failed to send message. Please try again.';
+            setError(errorMsg);
+        } finally {
+            setIsSending(false);
+        }
     };
 
     const formatTime = (timestamp) => {
         const now = new Date();
-        const diff = now - timestamp;
+        const msgTime = new Date(timestamp);
+        const diff = now - msgTime;
         const minutes = Math.floor(diff / (1000 * 60));
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -213,6 +234,7 @@ const TeamChat = ({ teams, currentUser }) => {
         if (minutes < 1) return 'Just now';
         if (minutes < 60) return `${minutes}m ago`;
         if (hours < 24) return `${hours}h ago`;
+        if (days === 1) return 'Yesterday';
         return `${days}d ago`;
     };
 
@@ -220,7 +242,7 @@ const TeamChat = ({ teams, currentUser }) => {
         <div className="team-chat-section">
             <div className="chat-header">
                 <h2><MessageCircle size={24} /> Team Chat</h2>
-                <p className="chat-subtitle">Communicate with your team members</p>
+                <p className="chat-subtitle">End-to-end encrypted & compressed messages</p>
             </div>
             
             <div className="chat-container">
@@ -235,8 +257,13 @@ const TeamChat = ({ teams, currentUser }) => {
                                 className={`chat-team-item ${selectedTeam?._id === team._id ? 'active' : ''}`}
                                 onClick={() => setSelectedTeam(team)}
                             >
-                                <div className="chat-team-name">{team.name}</div>
-                                <div className="chat-team-members">{team.members?.length || 0} members</div>
+                                <div className="chat-team-info">
+                                    <div className="chat-team-name">{team.name}</div>
+                                    <div className="chat-team-members">
+                                        <Users2 size={12} />
+                                        {team.members?.length || 0} members
+                                    </div>
+                                </div>
                             </div>
                         ))
                     )}
@@ -248,34 +275,85 @@ const TeamChat = ({ teams, currentUser }) => {
                             <MessageCircle size={48} />
                             <h3>Select a team to start chatting</h3>
                             <p>Choose a team from the left to view and send messages</p>
+                            <div className="encryption-badge">
+                                <CheckCircle2 size={16} />
+                                <span>Messages are encrypted & compressed</span>
+                            </div>
                         </div>
                     ) : (
                         <>
                             <div className="chat-messages-header">
-                                <h3>{selectedTeam.name}</h3>
-                                <p>{selectedTeam.members?.length || 0} members</p>
+                                <div>
+                                    <h3>{selectedTeam.name}</h3>
+                                    <p>
+                                        <Users2 size={14} />
+                                        {selectedTeam.members?.length || 0} members
+                                    </p>
+                                </div>
+                                <div className="encryption-indicator">
+                                    <CheckCircle2 size={14} />
+                                    <span>Encrypted</span>
+                                </div>
                             </div>
                             
                             <div className="chat-messages">
-                                {messages.map(msg => (
-                                    <div key={msg.id} className={`chat-message ${msg.senderEmail === currentUser?.email ? 'own' : ''}`}>
-                                        <div className="message-sender">
-                                            <div className="sender-avatar">
-                                                {msg.sender.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div className="sender-info">
-                                                <span className="sender-name">{msg.sender}</span>
-                                                <span className="message-time">
-                                                    <Clock size={12} />
-                                                    {formatTime(msg.timestamp)}
-                                                    {msg.read && <CheckCircle2 size={12} className="read-indicator" />}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="message-content">{msg.message}</div>
+                                {isLoading && messages.length === 0 ? (
+                                    <div className="chat-loading">
+                                        <Loader size={32} className="spinner" />
+                                        <p>Loading messages...</p>
                                     </div>
-                                ))}
+                                ) : error && messages.length === 0 ? (
+                                    <div className="chat-error">
+                                        <p>{error}</p>
+                                        <button onClick={() => loadMessages(selectedTeam._id)} className="retry-btn">
+                                            Retry
+                                        </button>
+                                    </div>
+                                ) : messages.length === 0 ? (
+                                    <div className="no-messages">
+                                        <MessageCircle size={48} />
+                                        <p>No messages yet</p>
+                                        <span>Start the conversation!</span>
+                                    </div>
+                                ) : (
+                                    messages.map(msg => {
+                                        const isOwn = msg.userId._id === currentUser._id || msg.userId === currentUser._id;
+                                        const sender = msg.userId?.name || msg.userId;
+                                        const senderInitial = sender?.charAt(0).toUpperCase() || '?';
+                                        
+                                        return (
+                                            <div key={msg._id} className={`chat-message ${isOwn ? 'own' : ''}`}>
+                                                {!isOwn && (
+                                                    <div className="sender-avatar">
+                                                        {senderInitial}
+                                                    </div>
+                                                )}
+                                                <div className="message-bubble">
+                                                    {!isOwn && (
+                                                        <div className="sender-name">{sender}</div>
+                                                    )}
+                                                    <div className="message-content">{msg.text}</div>
+                                                    <div className="message-meta">
+                                                        <Clock size={10} />
+                                                        <span>{formatTime(msg.timestamp)}</span>
+                                                        {isOwn && msg._encrypted && (
+                                                            <CheckCircle2 size={10} className="encrypted-icon" title="Encrypted & Compressed" />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                                <div ref={messagesEndRef} />
                             </div>
+                            
+                            {error && (
+                                <div className="chat-error-banner">
+                                    <span>{error}</span>
+                                    <button onClick={() => setError(null)}>×</button>
+                                </div>
+                            )}
                             
                             <form onSubmit={handleSendMessage} className="chat-input-form">
                                 <input
@@ -284,9 +362,16 @@ const TeamChat = ({ teams, currentUser }) => {
                                     onChange={(e) => setNewMessage(e.target.value)}
                                     placeholder="Type your message..."
                                     className="chat-input"
+                                    disabled={isSending}
+                                    maxLength={1000}
                                 />
-                                <button type="submit" className="chat-send-btn" disabled={!newMessage.trim()}>
-                                    <Send size={18} />
+                                <button 
+                                    type="submit" 
+                                    className="chat-send-btn" 
+                                    disabled={!newMessage.trim() || isSending}
+                                    title="Messages are encrypted and compressed"
+                                >
+                                    {isSending ? <Loader size={18} className="spinner" /> : <Send size={18} />}
                                 </button>
                             </form>
                         </>

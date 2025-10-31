@@ -112,6 +112,12 @@ export const createTeam = (payload) => api.post('/team/create', payload);
 export const updateTeamMembers = (teamId, memberIds) => api.patch(`/team/${teamId}/members`, { memberIds });
 export const deleteTeam = (teamId) => api.delete(`/team/${teamId}`);
 
+// --- MESSAGES API CALLS ---
+export const getTeamMessages = (teamId, params = {}) => api.get(`/messages/${teamId}`, { params });
+export const sendTeamMessage = (teamId, data) => api.post(`/messages/${teamId}`, data);
+export const markMessagesAsRead = (teamId, messageIds) => api.patch(`/messages/${teamId}/read`, { messageIds });
+export const deleteMessage = (messageId) => api.delete(`/messages/${messageId}`);
+export const getTeamMessageStats = (teamId) => api.get(`/messages/${teamId}/stats`);
 
 // --- Reports API Calls ---
 export const getDashboardStats = () => api.get('/reports/dashboard-stats');

@@ -28,6 +28,7 @@ import securityRoutes from './routes/security.js';
 import twoFARoutes from './routes/2fa.js';
 import statusRequestRoutes from './routes/statusRequests.js';
 import taskReportRoutes from './routes/taskReports.js';
+import messageRoutes from './routes/messages.js';
 
 
 const app = express();
@@ -99,6 +100,7 @@ app.use('/api/security', securityRoutes);
 app.use('/api/2fa', twoFARoutes);
 app.use('/api/status-requests', statusRequestRoutes);
 app.use('/api/task-reports', taskReportRoutes);
+app.use('/api/messages', messageRoutes);
 
 // --- Start Server ---
 const PORT = process.env.PORT || 5000;
