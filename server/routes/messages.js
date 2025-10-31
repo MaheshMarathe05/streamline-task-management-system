@@ -89,6 +89,7 @@ router.get('/:teamId', protect, async (req, res) => {
 
     // Fetch messages
     const messages = await Message.find({
+      messageType: 'team',
       teamId,
       timestamp: { $lt: before }
     })
@@ -165,6 +166,7 @@ router.post('/:teamId', protect, async (req, res) => {
 
     // Create message
     const message = new Message({
+      messageType: 'team',
       teamId,
       userId: req.user._id,
       text: encryptedText,

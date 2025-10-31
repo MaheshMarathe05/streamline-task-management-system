@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import NotificationsPage from './pages/NotificationsPage.jsx';
 import StatusRequestsPage from './pages/StatusRequestsPage.jsx';
 import TaskReportsPage from './pages/TaskReportsPage.jsx';
+import MessagesPage from './pages/MessagesPage.jsx';
 
 // Component Imports with .jsx extension
 import Layout from './components/Layout.jsx';
@@ -80,6 +81,7 @@ function App() {
           <Route path="/tasks" element={<ProtectedRoute><Layout><TasksPage /></Layout></ProtectedRoute>} />
           <Route path="/status-requests" element={<ProtectedRoute><Layout><StatusRequestsPage /></Layout></ProtectedRoute>} />
           <Route path="/task-reports" element={<ProtectedRoute><Layout><TaskReportsPage /></Layout></ProtectedRoute>} />
+          <Route path="/messages" element={<ProtectedRoute><Layout><MessagesPage /></Layout></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Layout><NotificationsPage /></Layout></ProtectedRoute>} />
           <Route path="/team" element={<ProtectedRoute><Layout><TeamPage /></Layout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />

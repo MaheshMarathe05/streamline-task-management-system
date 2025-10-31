@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { getTeamOverview, getAvailableUsers, addExistingMembers, createTeam, updateTeamMembers, deleteTeam, getTeamMessages, sendTeamMessage, markMessagesAsRead } from '../services/api';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getTeamOverview, getAvailableUsers, addExistingMembers, createTeam, updateTeamMembers, deleteTeam } from '../services/api';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X, Users2, MessageCircle, Send, Clock, CheckCircle2, Loader } from 'lucide-react';
+import { Plus, X, Users2 } from 'lucide-react';
 import './TeamPage.css';
 
 // Add Existing Member Modal
@@ -110,278 +110,6 @@ const CreateTeamModal = ({ setShowModal, selectedIds, onCreated }) => {
     );
 };
 
-// Team Chat Component with Encryption & Compression
-const TeamChat = ({ teams, currentUser }) => {
-    const [selectedTeam, setSelectedTeam] = useState(null);
-    const [newMessage, setNewMessage] = useState('');
-    const [messages, setMessages] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSending, setIsSending] = useState(false);
-    const [error, setError] = useState(null);
-    const messagesEndRef = useRef(null);
-    const chatInterval = useRef(null);
-
-    // Scroll to bottom of messages
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    // Load messages for selected team
-    const loadMessages = async (teamId, silent = false) => {
-        if (!silent) setIsLoading(true);
-        setError(null);
-        
-        try {
-            console.log('🔄 Loading messages for team:', teamId);
-            const response = await getTeamMessages(teamId, { limit: 50 });
-            console.log('📨 Messages response:', response);
-            
-            if (response?.data?.success) {
-                const messages = response.data.messages || [];
-                console.log(`✅ Loaded ${messages.length} messages`);
-                setMessages(messages);
-                setTimeout(scrollToBottom, 100);
-                
-                // Mark unread messages as read
-                const unreadIds = messages
-                    .filter(msg => 
-                        msg.userId?._id !== currentUser?._id && 
-                        !msg.readBy?.includes(currentUser?._id)
-                    )
-                    .map(msg => msg._id);
-                
-                if (unreadIds.length > 0) {
-                    await markMessagesAsRead(teamId, unreadIds).catch(err => 
-                        console.error('Failed to mark as read:', err)
-                    );
-                }
-            } else {
-                console.warn('❌ Unexpected response format:', response);
-                setError(response?.data?.error || 'Failed to load messages');
-            }
-        } catch (err) {
-            console.error('❌ Failed to load messages:', err);
-            const errorMsg = err.response?.data?.error || err.message || 'Failed to load messages. Please try again.';
-            setError(errorMsg);
-        } finally {
-            if (!silent) setIsLoading(false);
-        }
-    };
-
-    // Auto-refresh messages every 5 seconds
-    useEffect(() => {
-        if (selectedTeam) {
-            loadMessages(selectedTeam._id);
-            
-            // Set up polling
-            chatInterval.current = setInterval(() => {
-                loadMessages(selectedTeam._id, true); // Silent refresh
-            }, 5000);
-        }
-        
-        return () => {
-            if (chatInterval.current) {
-                clearInterval(chatInterval.current);
-            }
-        };
-    }, [selectedTeam]);
-
-    // Send message
-    const handleSendMessage = async (e) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !selectedTeam || isSending) return;
-
-        const messageText = newMessage.trim();
-        setIsSending(true);
-        setError(null);
-
-        try {
-            console.log('📤 Sending message:', messageText.substring(0, 20) + '...');
-            const response = await sendTeamMessage(selectedTeam._id, { 
-                text: messageText 
-            });
-            
-            console.log('📨 Send response:', response);
-            
-            if (response?.data?.success) {
-                // Add message to local state immediately
-                const newMsg = response.data.message;
-                console.log('✅ Message sent successfully');
-                setMessages(prev => [...prev, newMsg]);
-                setNewMessage('');
-                setTimeout(scrollToBottom, 100);
-            } else {
-                console.warn('❌ Failed to send:', response);
-                setError(response?.data?.error || 'Failed to send message');
-            }
-        } catch (err) {
-            console.error('❌ Failed to send message:', err);
-            const errorMsg = err.response?.data?.error || err.message || 'Failed to send message. Please try again.';
-            setError(errorMsg);
-        } finally {
-            setIsSending(false);
-        }
-    };
-
-    const formatTime = (timestamp) => {
-        const now = new Date();
-        const msgTime = new Date(timestamp);
-        const diff = now - msgTime;
-        const minutes = Math.floor(diff / (1000 * 60));
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-        if (minutes < 1) return 'Just now';
-        if (minutes < 60) return `${minutes}m ago`;
-        if (hours < 24) return `${hours}h ago`;
-        if (days === 1) return 'Yesterday';
-        return `${days}d ago`;
-    };
-
-    return (
-        <div className="team-chat-section">
-            <div className="chat-header">
-                <h2><MessageCircle size={24} /> Team Chat</h2>
-                <p className="chat-subtitle">End-to-end encrypted & compressed messages</p>
-            </div>
-            
-            <div className="chat-container">
-                <div className="chat-teams-list">
-                    <h3>Select Team</h3>
-                    {teams.length === 0 ? (
-                        <p className="no-teams">No teams available</p>
-                    ) : (
-                        teams.map(team => (
-                            <div
-                                key={team._id}
-                                className={`chat-team-item ${selectedTeam?._id === team._id ? 'active' : ''}`}
-                                onClick={() => setSelectedTeam(team)}
-                            >
-                                <div className="chat-team-info">
-                                    <div className="chat-team-name">{team.name}</div>
-                                    <div className="chat-team-members">
-                                        <Users2 size={12} />
-                                        {team.members?.length || 0} members
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-
-                <div className="chat-messages-panel">
-                    {!selectedTeam ? (
-                        <div className="no-chat-selected">
-                            <MessageCircle size={48} />
-                            <h3>Select a team to start chatting</h3>
-                            <p>Choose a team from the left to view and send messages</p>
-                            <div className="encryption-badge">
-                                <CheckCircle2 size={16} />
-                                <span>Messages are encrypted & compressed</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="chat-messages-header">
-                                <div>
-                                    <h3>{selectedTeam.name}</h3>
-                                    <p>
-                                        <Users2 size={14} />
-                                        {selectedTeam.members?.length || 0} members
-                                    </p>
-                                </div>
-                                <div className="encryption-indicator">
-                                    <CheckCircle2 size={14} />
-                                    <span>Encrypted</span>
-                                </div>
-                            </div>
-                            
-                            <div className="chat-messages">
-                                {isLoading && messages.length === 0 ? (
-                                    <div className="chat-loading">
-                                        <Loader size={32} className="spinner" />
-                                        <p>Loading messages...</p>
-                                    </div>
-                                ) : error && messages.length === 0 ? (
-                                    <div className="chat-error">
-                                        <p>{error}</p>
-                                        <button onClick={() => loadMessages(selectedTeam._id)} className="retry-btn">
-                                            Retry
-                                        </button>
-                                    </div>
-                                ) : messages.length === 0 ? (
-                                    <div className="no-messages">
-                                        <MessageCircle size={48} />
-                                        <p>No messages yet</p>
-                                        <span>Start the conversation!</span>
-                                    </div>
-                                ) : (
-                                    messages.map(msg => {
-                                        const isOwn = msg.userId._id === currentUser._id || msg.userId === currentUser._id;
-                                        const sender = msg.userId?.name || msg.userId;
-                                        const senderInitial = sender?.charAt(0).toUpperCase() || '?';
-                                        
-                                        return (
-                                            <div key={msg._id} className={`chat-message ${isOwn ? 'own' : ''}`}>
-                                                {!isOwn && (
-                                                    <div className="sender-avatar">
-                                                        {senderInitial}
-                                                    </div>
-                                                )}
-                                                <div className="message-bubble">
-                                                    {!isOwn && (
-                                                        <div className="sender-name">{sender}</div>
-                                                    )}
-                                                    <div className="message-content">{msg.text}</div>
-                                                    <div className="message-meta">
-                                                        <Clock size={10} />
-                                                        <span>{formatTime(msg.timestamp)}</span>
-                                                        {isOwn && msg._encrypted && (
-                                                            <CheckCircle2 size={10} className="encrypted-icon" title="Encrypted & Compressed" />
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                                <div ref={messagesEndRef} />
-                            </div>
-                            
-                            {error && (
-                                <div className="chat-error-banner">
-                                    <span>{error}</span>
-                                    <button onClick={() => setError(null)}>×</button>
-                                </div>
-                            )}
-                            
-                            <form onSubmit={handleSendMessage} className="chat-input-form">
-                                <input
-                                    type="text"
-                                    value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
-                                    placeholder="Type your message..."
-                                    className="chat-input"
-                                    disabled={isSending}
-                                    maxLength={1000}
-                                />
-                                <button 
-                                    type="submit" 
-                                    className="chat-send-btn" 
-                                    disabled={!newMessage.trim() || isSending}
-                                    title="Messages are encrypted and compressed"
-                                >
-                                    {isSending ? <Loader size={18} className="spinner" /> : <Send size={18} />}
-                                </button>
-                            </form>
-                        </>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
 const TeamPage = () => {
         const navigate = useNavigate();
         const { user } = useAuth();
@@ -393,7 +121,6 @@ const TeamPage = () => {
         const [showAddModal, setShowAddModal] = useState(false);
         const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
         const [selectedIds, setSelectedIds] = useState(new Set());
-        const [activeTab, setActiveTab] = useState('teams'); // 'teams' or 'chat'
 
     useEffect(() => {
         if (user?.role !== 'manager') {
@@ -491,36 +218,19 @@ const TeamPage = () => {
         <div className="page-container">
             <header className="page-header">
                 <h1>Team Management</h1>
-                <div className="tab-navigation">
-                    <button 
-                        className={`tab-btn ${activeTab === 'teams' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('teams')}
+                <div className="actions-right">
+                    <button
+                        onClick={() => setShowCreateTeamModal(true)}
+                        className="btn-primary create-team-btn"
+                        disabled={selectedIds.size === 0}
+                        title={selectedIds.size === 0 ? 'Select employees to create a team' : 'Create New Team'}
                     >
-                        <Users2 size={18} /> Teams
-                    </button>
-                    <button 
-                        className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('chat')}
-                    >
-                        <MessageCircle size={18} /> Chat
+                        <Users2 size={18}/> Create New Team
                     </button>
                 </div>
-                {activeTab === 'teams' && (
-                    <div className="actions-right">
-                        <button
-                            onClick={() => setShowCreateTeamModal(true)}
-                            className="btn-primary create-team-btn"
-                            disabled={selectedIds.size === 0}
-                            title={selectedIds.size === 0 ? 'Select employees to create a team' : 'Create New Team'}
-                        >
-                            <Users2 size={18}/> Create New Team
-                        </button>
-                    </div>
-                )}
             </header>
 
-            {activeTab === 'teams' && (
-                <div className="teams-content">
+            <div className="teams-content">
                     {/* Teams grouped section - editable */}
                     {teams.map(team => {
                                                                             const isEditing = editingTeamId === team._id;
@@ -626,11 +336,6 @@ const TeamPage = () => {
                         />
                     )}
                 </div>
-            )}
-
-            {activeTab === 'chat' && (
-                <TeamChat teams={teams} currentUser={user} />
-            )}
         </div>
     );
 };

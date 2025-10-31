@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, CheckSquare, Users, LogOut, Settings, Zap, Bell, Clock, FileText } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, CheckSquare, Users, LogOut, Settings, Zap, Bell, Clock, FileText, MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import './Layout.css';
 
@@ -48,6 +48,10 @@ const Layout = ({ children }) => {
                         <NavLink to="/task-reports" className="nav-link">
                             <FileText className="nav-icon" />
                             <span className="nav-text">Task Reports</span>
+                        </NavLink>
+                        <NavLink to="/messages" className="nav-link">
+                            <MessageCircle className="nav-icon" />
+                            <span className="nav-text">Messages</span>
                         </NavLink>
                         <NavLink to="/notifications" className="nav-link">
                             <Bell className="nav-icon" />

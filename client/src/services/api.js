@@ -119,6 +119,14 @@ export const markMessagesAsRead = (teamId, messageIds) => api.patch(`/messages/$
 export const deleteMessage = (messageId) => api.delete(`/messages/${messageId}`);
 export const getTeamMessageStats = (teamId) => api.get(`/messages/${teamId}/stats`);
 
+// --- DIRECT MESSAGES API CALLS ---
+export const getAllUsers = () => api.get('/direct-messages/users');
+export const getConversations = () => api.get('/direct-messages/conversations');
+export const getDirectMessages = (userId) => api.get(`/direct-messages/${userId}`);
+export const sendDirectMessage = (userId, data) => api.post(`/direct-messages/${userId}`, data);
+export const markDirectMessagesAsRead = (userId) => api.patch(`/direct-messages/${userId}/read`);
+export const deleteDirectMessage = (messageId) => api.delete(`/direct-messages/${messageId}`);
+
 // --- Reports API Calls ---
 export const getDashboardStats = () => api.get('/reports/dashboard-stats');
 export const getProjectStats = () => api.get('/reports/project-stats');

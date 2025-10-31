@@ -1,7 +1,25 @@
 import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
-  teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true, index: true },
+  messageType: { 
+    type: String, 
+    enum: ['team', 'direct'], 
+    required: true, 
+    default: 'team',
+    index: true 
+  },
+  teamId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Team', 
+    index: true,
+    required: function() { return this.messageType === 'team'; }
+  },
+  recipientId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    index: true,
+    required: function() { return this.messageType === 'direct'; }
+  },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   text: { type: String, required: true }, // Encrypted and compressed text
   file: { type: String }, // Optional: file attachment URL
@@ -13,9 +31,11 @@ const messageSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for efficient queries
+// Indexes for efficient queries
 messageSchema.index({ teamId: 1, timestamp: -1 });
 messageSchema.index({ teamId: 1, userId: 1 });
+messageSchema.index({ messageType: 1, userId: 1, recipientId: 1 });
+messageSchema.index({ messageType: 1, recipientId: 1, timestamp: -1 });
 
 export default mongoose.model('Message', messageSchema);
 
