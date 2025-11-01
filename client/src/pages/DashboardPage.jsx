@@ -60,28 +60,28 @@ const DashboardPage = () => {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                console.log('📊 Fetching dashboard stats...');
-                console.log('🔑 User Info:', { name: user?.name, email: user?.email, role: user?.role });
+                console.log('Fetching dashboard stats...');
+                console.log('User Info:', { name: user?.name, email: user?.email, role: user?.role });
                 const response = await getDashboardStats();
-                console.log('✅ Dashboard stats response:', response);
-                console.log('📦 Response data:', response?.data);
+                console.log('Dashboard stats response:', response);
+                console.log('Response data:', response?.data);
                 if (response && response.data) {
                     setStats(response.data);
-                    console.log('✅ Stats set successfully:', response.data);
-                    console.log('📊 Todo:', response.data.todoCount, 'In Progress:', response.data.inProgressCount, 'Done:', response.data.doneCount);
+                    console.log('Stats set successfully:', response.data);
+                    console.log('Todo:', response.data.todoCount, 'In Progress:', response.data.inProgressCount, 'Done:', response.data.doneCount);
                     setApiError(null); // Clear any previous errors
                 } else {
-                    console.error('❌ Invalid response structure:', response);
+                    console.error('Invalid response structure:', response);
                     setApiError('Invalid data received from server');
                 }
             } catch (error) {
-                console.error("❌ Could not fetch dashboard stats:", error);
+                console.error("Could not fetch dashboard stats:", error);
                 console.error('Error details:', error.response || error.message);
                 console.error('Full error:', error);
                 if (error.code === 'ERR_NETWORK' || error.message?.includes('Network')) {
                     setApiError('Cannot connect to server. Please ensure the backend is running.');
                 } else if (error.response?.status === 500) {
-                    setApiError('Server error. MongoDB might not be running. Check DATABASE_SETUP_GUIDE.md');
+                    setApiError('Server error. MongoDB might not be running.');
                 } else {
                     setApiError('Failed to load dashboard data');
                 }
@@ -90,22 +90,22 @@ const DashboardPage = () => {
         
         const fetchProjectStats = async () => {
             try {
-                console.log('📈 Fetching project stats...');
+                console.log('Fetching project stats...');
                 const response = await getProjectStats();
-                console.log('✅ Project stats response:', response);
-                console.log('📦 Response data:', response?.data);
+                console.log('Project stats response:', response);
+                console.log('Response data:', response?.data);
                 if (response && response.data) {
                     setProjectStats(response.data);
-                    console.log('✅ Project stats set successfully:', response.data);
-                    console.log('📊 Active Projects:', response.data.activeProjectsCount, 'Total:', response.data.totalProjects);
-                    console.log('📊 Completed Projects:', response.data.completedProjectsCount);
-                    console.log('📊 Completion Rate:', response.data.completionRate + '%');
-                    console.log('📊 Recent Projects:', response.data.recentProjects?.length);
-                    console.log('📊 Project Task Stats:', response.data.projectTaskStats);
-                    console.log('📊 Project Task Stats Length:', response.data.projectTaskStats?.length);
+                    console.log('Project stats set successfully:', response.data);
+                    console.log('Active Projects:', response.data.activeProjectsCount, 'Total:', response.data.totalProjects);
+                    console.log('Completed Projects:', response.data.completedProjectsCount);
+                    console.log('Completion Rate:', response.data.completionRate + '%');
+                    console.log('Recent Projects:', response.data.recentProjects?.length);
+                    console.log('Project Task Stats:', response.data.projectTaskStats);
+                    console.log('Project Task Stats Length:', response.data.projectTaskStats?.length);
                     
                     // 🔍 DEBUG: Log each recent project's progress field
-                    console.log('🔍 CHECKING RECENT PROJECTS PROGRESS:');
+                    console.log('CHECKING RECENT PROJECTS PROGRESS:');
                     response.data.recentProjects?.forEach((proj, idx) => {
                         console.log(`  Project #${idx + 1}: "${proj.name}"`, {
                             progress: proj.progress,
@@ -119,11 +119,11 @@ const DashboardPage = () => {
                     
                     setApiError(null); // Clear any previous errors
                 } else {
-                    console.error('❌ Invalid response structure:', response);
+                    console.error('Invalid response structure:', response);
                     setApiError('Invalid project data received from server');
                 }
             } catch (error) {
-                console.error("❌ Could not fetch project stats:", error);
+                console.error("Could not fetch project stats:", error);
                 console.error('Error details:', error.response || error.message);
                 console.error('Full error:', error);
                 if (error.code === 'ERR_NETWORK' || error.message?.includes('Network')) {

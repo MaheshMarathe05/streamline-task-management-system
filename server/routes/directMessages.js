@@ -7,16 +7,46 @@ import zlib from 'zlib';
 
 const router = express.Router();
 
-// Encryption key - should match the one in messages.js
-const ENCRYPTION_KEY = process.env.MESSAGE_ENCRYPTION_KEY || crypto.randomBytes(32);
+// Lazy load encryption key - called first time it's needed
+// This ensures process.env is already loaded by dotenv
+let ENCRYPTION_KEY = null;
+let keyWarningShown = false;
+
+function getEncryptionKey() {
+  if (ENCRYPTION_KEY) return ENCRYPTION_KEY;
+  
+  if (process.env.MESSAGE_ENCRYPTION_KEY) {
+    // Convert hex string to Buffer
+    ENCRYPTION_KEY = Buffer.from(process.env.MESSAGE_ENCRYPTION_KEY, 'hex');
+    if (ENCRYPTION_KEY.length !== 32) {
+      console.error('⚠️  MESSAGE_ENCRYPTION_KEY must be 32 bytes (64 hex characters)!');
+      console.error('   Current length:', ENCRYPTION_KEY.length);
+      console.error('   Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+      throw new Error('Invalid encryption key length');
+    }
+    console.log('✅ Direct messages encryption key loaded from environment');
+  } else {
+    if (!keyWarningShown) {
+      console.warn('⚠️  WARNING: MESSAGE_ENCRYPTION_KEY not set in .env file!');
+      console.warn('   Using default key - NOT SECURE FOR PRODUCTION!');
+      keyWarningShown = true;
+    }
+    // Use a consistent default key (NOT SECURE - for development only)
+    ENCRYPTION_KEY = Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
+  }
+  
+  return ENCRYPTION_KEY;
+}
+
 const IV_LENGTH = 16;
 
 // Encrypt message with compression
 function encryptMessage(text) {
   try {
+    const key = getEncryptionKey(); // Lazy load key
     const compressed = zlib.gzipSync(text);
     const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encrypted = cipher.update(compressed);
     encrypted = Buffer.concat([encrypted, cipher.final()]);
     return iv.toString('hex') + ':' + encrypted.toString('hex');
@@ -29,11 +59,16 @@ function encryptMessage(text) {
 // Decrypt and decompress message
 function decryptMessage(encryptedText) {
   try {
+    const key = getEncryptionKey(); // Lazy load key
     const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted message format');
+    }
+    
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = Buffer.from(parts[1], 'hex');
     
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(encrypted);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     
