@@ -2,21 +2,45 @@
 .app-layout {
   display: flex;
   min-height: 100vh;
+  max-height: 100vh;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
 }
 
 .main-sidebar {
   width: 280px;
-  background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
-  border-right: 1px solid rgba(148, 163, 184, 0.15);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   padding: 2rem 1.5rem;
   flex-shrink: 0;
   box-shadow: var(--shadow-colorful);
   z-index: 10;
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.main-sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+}
+
+.main-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
 }
 
 .sidebar-header {
@@ -190,8 +214,10 @@
 .content-wrapper {
   flex: 1;
   overflow-y: auto;
-  background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
+  background: var(--bg-primary);
   position: relative;
+  margin-left: 280px;
+  height: 100vh;
 }
 
 .content-inner {
@@ -204,6 +230,10 @@
   .main-sidebar {
     width: 90px;
     padding: 2rem 1rem;
+  }
+  
+  .content-wrapper {
+    margin-left: 90px;
   }
   
   .nav-text,
