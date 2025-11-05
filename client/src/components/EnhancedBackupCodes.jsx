@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { generateBackupCodes } from '../services/api';
+// import { generateBackupCodes } from '../services/api'; // REMOVED - backup codes system replaced with OTP
 import './EnhancedBackupCodes.css';
 
 const EnhancedBackupCodes = ({ onCodesGenerated, onClose }) => {

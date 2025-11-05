@@ -32,17 +32,6 @@ export const loginUser = async (email, password) => {
   }
 };
 
-export const verifyBackupCode = async (tempToken, backupCode) => {
-  try {
-    const response = await api.post('/auth/verify-backup-code', { tempToken, backupCode });
-    return response.data;
-  } catch (error) {
-    if (error.response) return error.response.data;
-    if (error.request) return { success: false, error: 'Network unreachable.' };
-    return { success: false, error: 'Request setup failed' };
-  }
-};
-
 export const logoutUser = async () => {
   try {
     const response = await api.post('/auth/logout');
@@ -144,8 +133,7 @@ export const getSecurityLogs = (params = {}) => api.get('/security/logs', { para
 export const setupTOTP = () => api.post('/2fa/setup-totp');
 export const enable2FA = (code) => api.post('/2fa/enable', { code });
 export const disable2FA = () => api.post('/2fa/disable');
-export const generateBackupCodes = () => api.post('/users/generate-backup-codes');
-export const verifyMFAAndLogin = ({ mfaToken, code, backupCode }) => api.post('/auth/mfa/verify', { mfaToken, code, backupCode });
+export const verifyMFAAndLogin = ({ mfaToken, code }) => api.post('/auth/mfa/verify', { mfaToken, code });
 
 // --- USER API CALLS ---
 export const getSecurityActivity = () => api.get('/users/security-activity');
@@ -155,10 +143,43 @@ export const requestAccountRecovery = (email, reason) => api.post('/recovery/req
 export const verifyRecoveryToken = (token) => api.post('/recovery/verify-recovery', { token });
 export const emergencyLogin = (token) => api.post('/recovery/emergency-login', { token });
 
-// --- REGENERATE BACKUP CODES ---
-export const regenerateBackupCodes = async (email, backupCode) => {
+// --- PASSWORD RESET WITH OTP ---
+export const requestPasswordReset = async (email) => {
   try {
-    const response = await api.post('/auth/regenerate-backup-codes-with-code', { email, backupCode });
+    const response = await api.post('/auth/request-password-reset', { email });
+    return response.data;
+  } catch (error) {
+    if (error.response) return error.response.data;
+    if (error.request) return { success: false, error: 'Network unreachable.' };
+    return { success: false, error: 'Request setup failed' };
+  }
+};
+
+export const resetPasswordWithOTP = async (email, otp, newPassword) => {
+  try {
+    const response = await api.post('/auth/reset-password-with-otp', { email, otp, newPassword });
+    return response.data;
+  } catch (error) {
+    if (error.response) return error.response.data;
+    if (error.request) return { success: false, error: 'Network unreachable.' };
+    return { success: false, error: 'Request setup failed' };
+  }
+};
+
+export const sendPasswordChangeOTP = async () => {
+  try {
+    const response = await api.post('/auth/send-password-change-otp');
+    return response.data;
+  } catch (error) {
+    if (error.response) return error.response.data;
+    if (error.request) return { success: false, error: 'Network unreachable.' };
+    return { success: false, error: 'Request setup failed' };
+  }
+};
+
+export const changePassword = async (currentPassword, newPassword, otpCode) => {
+  try {
+    const response = await api.post('/auth/change-password', { currentPassword, newPassword, otpCode });
     return response.data;
   } catch (error) {
     if (error.response) return error.response.data;

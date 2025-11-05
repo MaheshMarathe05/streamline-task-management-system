@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { regenerateBackupCodes } from '../services/api';
+// import { regenerateBackupCodes } from '../services/api'; // REMOVED - backup codes system replaced with OTP
 import EnhancedBackupCodes from '../components/EnhancedBackupCodes';
 import './AccountRecoveryPage.css';
 

@@ -49,27 +49,12 @@ router.post('/disable', protect, async (req, res) => {
     const user = await User.findById(req.user._id);
     user.twoFactor.enabled = false;
     user.twoFactor.totpSecret = undefined;
-    user.twoFactor.backupCodes = [];
     await user.save();
     try { await SecurityLog.create({ user: user._id, event: '2fa_disabled', ip: req.ip, userAgent: req.headers['user-agent'] }); } catch {}
     res.json({ success: true });
   } catch (err) {
     console.error('2FA disable error:', err);
     res.status(500).json({ success: false, error: 'Failed to disable 2FA' });
-  }
-});
-
-// POST /api/2fa/backup-codes - generate backup codes
-router.post('/backup-codes', protect, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id);
-    const codes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex'));
-    user.twoFactor.backupCodes = codes.map(c => ({ codeHash: crypto.createHash('sha256').update(c).digest('hex') }));
-    await user.save();
-    res.json({ success: true, codes }); // frontend will download txt
-  } catch (err) {
-    console.error('Backup codes error:', err);
-    res.status(500).json({ success: false, error: 'Failed to generate backup codes' });
   }
 });
 

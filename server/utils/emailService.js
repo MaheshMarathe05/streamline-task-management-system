@@ -109,7 +109,7 @@ export async function sendVerificationEmail(email, otp, name) {
       console.log('='.repeat(60));
       console.log(`👤 Name:  ${name}`);
       console.log(`📨 Email: ${email}`);
-      console.log(`🔑 OTP:   ${otp}`);
+      //console.log(`🔑 OTP:   ${otp}`);
       console.log('⏰ Valid for: 10 minutes');
       console.log('='.repeat(60) + '\n');
     }
@@ -178,6 +178,7 @@ export async function sendWelcomeEmail(email, name) {
 
     await transporter.sendMail(mailOptions);
 
+
     if (!process.env.EMAIL_HOST_USER) {
       console.log(`\n📧 WELCOME EMAIL sent to ${email} (Development Mode)\n`);
     }
@@ -187,5 +188,89 @@ export async function sendWelcomeEmail(email, name) {
     console.error('Welcome email error:', error);
     // Don't throw - this is non-critical
     return { success: false };
+  }
+}
+
+// Send password reset OTP email
+export async function sendPasswordResetEmail(email, otp, name) {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"Streamline Task Management" <${process.env.EMAIL_HOST_USER || 'noreply@streamline.com'}>`,
+      to: email,
+      subject: '🔐 Password Reset Code - Streamline',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .otp-box { background: white; border: 3px solid #3b82f6; border-radius: 12px; padding: 25px; text-align: center; margin: 25px 0; }
+            .otp-code { font-size: 42px; font-weight: bold; color: #3b82f6; letter-spacing: 10px; font-family: 'Courier New', monospace; }
+            .warning { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px; }
+            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔐 Password Reset Request</h1>
+            </div>
+            <div class="content">
+              <h2>Hi ${name},</h2>
+              <p>We received a request to reset your password for your Streamline account.</p>
+              <p>Use the verification code below to reset your password:</p>
+              
+              <div class="otp-box">
+                <p style="margin: 0; color: #666; font-size: 14px;">Your Reset Code</p>
+                <div class="otp-code">${otp}</div>
+                <p style="margin: 0; color: #666; font-size: 14px;">Valid for 10 minutes</p>
+              </div>
+
+              <div class="warning">
+                <strong>⚠️ Security Alert:</strong>
+                <ul style="margin: 10px 0;">
+                  <li>Never share this code with anyone</li>
+                  <li>This code expires in 10 minutes</li>
+                  <li>If you didn't request this, please ignore this email</li>
+                  <li>Your password will not change until you use this code</li>
+                </ul>
+              </div>
+
+              <p>If you have any questions, contact our support team.</p>
+              <p>Best regards,<br><strong>Streamline Team</strong></p>
+            </div>
+            <div class="footer">
+              <p>© ${new Date().getFullYear()} Streamline Task Management System. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    // Send email
+    const info = await transporter.sendMail(mailOptions);
+
+    // If using development mode (streamTransport), log the email
+    if (!process.env.EMAIL_HOST_USER) {
+      console.log('\n' + '='.repeat(60));
+      console.log('🔐 PASSWORD RESET CODE (Development Mode)');
+      console.log('='.repeat(60));
+      console.log(`👤 Name:  ${name}`);
+      console.log(`📨 Email: ${email}`);
+      console.log(`🔑 OTP:   ${otp}`);
+      console.log('⏰ Valid for: 10 minutes');
+      console.log('='.repeat(60) + '\n');
+    }
+
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Password reset email error:', error);
+    throw new Error('Failed to send password reset email');
   }
 }

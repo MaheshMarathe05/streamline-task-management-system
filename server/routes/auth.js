@@ -2,6 +2,7 @@ import express from "express";
 import User from "../models/User.js";
 import SecurityActivity from "../models/SecurityActivity.js";
 import EmailVerification from "../models/EmailVerification.js";
+import PasswordReset from "../models/PasswordReset.js";
 import jwt from "jsonwebtoken";
 import argon2 from "argon2"; // Argon2id for password verification (memory-hard, GPU-resistant, modern PHC winner)
 import bcrypt from 'bcrypt';
@@ -9,7 +10,7 @@ import passport from "passport";
 import { protect } from "../middleware/authMiddleware.js";
 import SecurityLog from "../models/SecurityLog.js";
 import { authenticator } from 'otplib';
-import { generateOTP, sendVerificationEmail, sendWelcomeEmail } from "../utils/emailService.js";
+import { generateOTP, sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail } from "../utils/emailService.js";
 import crypto from 'crypto';
 import Notification from "../models/Notification.js";
 
@@ -283,148 +284,6 @@ router.post("/login", async (req, res) => {
     console.error("Login Error:", err.message);
     try { await SecurityLog.create({ user: undefined, event: 'login_error', ip: req.ip, userAgent: req.headers['user-agent'], success: false, metadata: { email } }); } catch {}
     res.status(500).json({ success: false, error: "Server error during login" });
-  }
-});
-
-// --- Verify backup code to complete login (Step 2) ---
-router.post('/verify-backup-code', async (req, res) => {
-  const { tempToken, backupCode } = req.body;
-  
-  if (!tempToken || !backupCode) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Temporary token and backup code are required' 
-    });
-  }
-  
-  try {
-    // Verify the temporary token
-    const decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
-    
-    if (decoded.step !== 'password-verified') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid temporary token' 
-      });
-    }
-    
-    // Find the user
-    const user = await User.findById(decoded.userId);
-    if (!user) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'User not found' 
-      });
-    }
-    
-    // Check if user has backup codes
-    if (!user.twoFactor?.backupCodes || user.twoFactor.backupCodes.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No backup codes found. Please use account recovery.', 
-        requiresRecovery: true
-      });
-    }
-    
-    // Check for available (unused) backup codes
-    const availableCodes = user.twoFactor.backupCodes.filter(code => !code.isUsed);
-    if (availableCodes.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'All backup codes have been used. Please use account recovery.', 
-        requiresRecovery: true,
-        allCodesExhausted: true
-      });
-    }
-    
-    // Find a matching unused backup code
-    let matchedCodeIndex = -1;
-    for (let i = 0; i < user.twoFactor.backupCodes.length; i++) {
-      const codeObj = user.twoFactor.backupCodes[i];
-      if (!codeObj.isUsed) {
-        const isMatch = await bcrypt.compare(backupCode, codeObj.codeHash);
-        if (isMatch) {
-          matchedCodeIndex = i;
-          break;
-        }
-      }
-    }
-    
-    if (matchedCodeIndex === -1) {
-      SecurityLog.create({ 
-        user: user._id, 
-        event: 'login_backup_code_failed', 
-        ip: req.ip, 
-        userAgent: req.headers['user-agent'] 
-      }).catch(()=>{});
-      
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid or already used backup code' 
-      });
-    }
-    
-    // Mark the code as used
-    user.twoFactor.backupCodes[matchedCodeIndex].isUsed = true;
-    await user.save();
-    
-    // Record login in security activity
-    const securityActivity = new SecurityActivity({
-      userId: user._id,
-      loginTime: new Date()
-    });
-    await securityActivity.save();
-    
-    // Generate final JWT token
-    const payload = {
-      user: {
-        id: user.id,
-        role: user.role,
-      },
-      activityId: securityActivity._id // Store activity ID for logout tracking
-    };
-    
-    // Check remaining backup codes and warn if low
-    const remainingCodes = user.twoFactor.backupCodes.filter(code => !code.isUsed).length;
-    const isLowOnCodes = remainingCodes <= 2;
-    
-    try {
-      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
-      SecurityLog.create({ 
-        user: user._id, 
-        event: 'login_success', 
-        ip: req.ip, 
-        userAgent: req.headers['user-agent'] 
-      }).catch(() => {});
-      
-      return res.json({
-        success: true,
-        token,
-        user: { 
-          id: user.id, 
-          name: user.name, 
-          email: user.email, 
-          role: user.role 
-        },
-        activityId: securityActivity._id,
-        backupCodesRemaining: remainingCodes,
-        lowOnBackupCodes: isLowOnCodes,
-        warning: isLowOnCodes ? `Warning: Only ${remainingCodes} backup codes remaining. Generate new codes soon.` : null
-      });
-    } catch(tokenErr) {
-      console.error('JWT sign error:', tokenErr);
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Auth token generation failed' 
-      });
-    }
-    
-  } catch (err) {
-    console.error('Backup code verification error:', err);
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Invalid or expired temporary token' 
-    });
   }
 });
 
@@ -794,85 +653,174 @@ router.post('/generate-backup-codes', async (req, res) => {
   }
 });
 
-// --- Verify backup code for password reset ---
-router.post('/verify-backup-code-for-reset', async (req, res) => {
-  const { email, backupCode } = req.body;
-  
-  if (!email || !backupCode) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Email and backup code are required' 
-    });
+// ========================================
+// PASSWORD RESET WITH OTP (New System)
+// ========================================
+
+// Request password reset - sends OTP to email
+router.post('/request-password-reset', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email is required' });
   }
 
   try {
-    const user = await User.findOne({ email });
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'User not found' 
+      // Don't reveal if user exists or not for security
+      return res.json({ 
+        success: true, 
+        message: 'If an account exists with this email, a password reset code has been sent.' 
       });
     }
 
-    if (!user.twoFactor?.backupCodes || user.twoFactor.backupCodes.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No backup codes available for this account' 
-      });
-    }
+    // Generate OTP
+    const otp = generateOTP();
+    console.log(`🔐 Generated Password Reset OTP for ${email}: ${otp}`);
 
-    // Check if backup code is valid
-    let validCodeFound = false;
-    for (const codeObj of user.twoFactor.backupCodes) {
-      if (!codeObj.isUsed) {
-        const isValid = await bcrypt.compare(backupCode, codeObj.codeHash);
-        if (isValid) {
-          validCodeFound = true;
-          break;
-        }
-      }
-    }
+    // Delete any existing password reset for this email
+    await PasswordReset.deleteMany({ email: email.toLowerCase().trim() });
 
-    if (!validCodeFound) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid backup code' 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      message: 'Backup code verified. You can now reset your password.' 
+    // Store password reset request
+    const passwordReset = new PasswordReset({
+      email: email.toLowerCase().trim(),
+      otp
     });
+    await passwordReset.save();
+
+    // Send password reset email
+    try {
+      await sendPasswordResetEmail(email, otp, user.name);
+      console.log(`✅ Password reset email sent to ${email}`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Password reset code sent to your email.' 
+      });
+    } catch (emailError) {
+      console.error('❌ Failed to send password reset email:', emailError);
+      await PasswordReset.deleteOne({ email: email.toLowerCase().trim() });
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to send password reset email. Please try again.' 
+      });
+    }
   } catch (error) {
-    console.error('Verify backup code error:', error);
+    console.error('Request password reset error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to verify backup code' 
+      error: 'Failed to process password reset request' 
     });
   }
 });
 
-// --- Reset password with backup code ---
-router.post('/reset-password-with-backup', async (req, res) => {
-  const { email, backupCode, newPassword } = req.body;
-  
-  if (!email || !backupCode || !newPassword) {
+// Verify OTP and reset password
+router.post('/reset-password-with-otp', async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
     return res.status(400).json({ 
       success: false, 
-      error: 'Email, backup code, and new password are required' 
+      error: 'Email, OTP, and new password are required' 
     });
   }
 
-  if (newPassword.length < 6) {
+  // Validate password strength
+  if (newPassword.length < 8) {
     return res.status(400).json({ 
       success: false, 
-      error: 'Password must be at least 6 characters long' 
+      error: 'Password must be at least 8 characters long' 
     });
   }
 
   try {
-    const user = await User.findOne({ email });
+    // Find password reset request
+    const resetRequest = await PasswordReset.findOne({ 
+      email: email.toLowerCase().trim() 
+    });
+
+    if (!resetRequest) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid or expired reset code. Please request a new one.' 
+      });
+    }
+
+    // Verify OTP
+    if (resetRequest.otp !== otp.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid verification code' 
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    
+    if (!user) {
+      await PasswordReset.deleteOne({ email: email.toLowerCase().trim() });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found' 
+      });
+    }
+
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    await user.save();
+
+    // Delete the reset request
+    await PasswordReset.deleteOne({ email: email.toLowerCase().trim() });
+
+    // Log security event
+    try {
+      await SecurityLog.create({ 
+        user: user._id, 
+        event: 'password_reset_with_otp', 
+        ip: req.ip, 
+        userAgent: req.headers['user-agent'] 
+      });
+    } catch {}
+
+    res.json({ 
+      success: true, 
+      message: 'Password reset successful! You can now login with your new password.' 
+    });
+  } catch (error) {
+    console.error('Reset password with OTP error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to reset password' 
+    });
+  }
+});
+
+// Change password (for logged-in users in settings)
+router.post('/change-password', protect, async (req, res) => {
+  const { currentPassword, newPassword, otpCode } = req.body;
+
+  if (!currentPassword || !newPassword || !otpCode) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Current password, new password, and OTP code are required' 
+    });
+  }
+
+  // Validate new password
+  if (newPassword.length < 8) {
+    return res.status(400).json({ 
+      success: false, 
+      error: 'New password must be at least 8 characters long' 
+    });
+  }
+
+  try {
+    // Find user
+    const user = await User.findById(req.user._id);
+    
     if (!user) {
       return res.status(404).json({ 
         success: false, 
@@ -880,57 +828,96 @@ router.post('/reset-password-with-backup', async (req, res) => {
       });
     }
 
-    if (!user.twoFactor?.backupCodes || user.twoFactor.backupCodes.length === 0) {
+    // Verify current password
+    const isMatch = await argon2.verify(user.password, currentPassword);
+    if (!isMatch) {
       return res.status(400).json({ 
         success: false, 
-        error: 'No backup codes available for this account' 
+        error: 'Current password is incorrect' 
       });
     }
 
-    // Find and mark the backup code as used
-    let validCodeIndex = -1;
-    for (let i = 0; i < user.twoFactor.backupCodes.length; i++) {
-      const codeObj = user.twoFactor.backupCodes[i];
-      if (!codeObj.isUsed) {
-        const isValid = await bcrypt.compare(backupCode, codeObj.codeHash);
-        if (isValid) {
-          validCodeIndex = i;
-          break;
-        }
-      }
-    }
+    // Verify OTP
+    const resetRequest = await PasswordReset.findOne({ 
+      email: user.email.toLowerCase() 
+    });
 
-    if (validCodeIndex === -1) {
+    if (!resetRequest || resetRequest.otp !== otpCode.trim()) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Invalid or already used backup code' 
+        error: 'Invalid or expired verification code' 
       });
     }
 
-    // Mark backup code as used
-    user.twoFactor.backupCodes[validCodeIndex].isUsed = true;
-
-    // Hash and save new password
-    user.password = await argon2.hash(newPassword);
+    // Update password
+    user.password = newPassword;
     await user.save();
 
-    // Log security activity
-    SecurityLog.create({ 
-      user: user._id, 
-      event: 'password_reset_with_backup', 
-      ip: req.ip, 
-      userAgent: req.headers['user-agent'] 
-    }).catch(() => {});
+    // Delete OTP
+    await PasswordReset.deleteOne({ email: user.email.toLowerCase() });
+
+    // Log security event
+    try {
+      await SecurityLog.create({ 
+        user: user._id, 
+        event: 'password_changed', 
+        ip: req.ip, 
+        userAgent: req.headers['user-agent'] 
+      });
+    } catch {}
 
     res.json({ 
       success: true, 
-      message: 'Password reset successful' 
+      message: 'Password changed successfully!' 
     });
   } catch (error) {
-    console.error('Reset password error:', error);
+    console.error('Change password error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to reset password' 
+      error: 'Failed to change password' 
+    });
+  }
+});
+
+// Send OTP for password change (in settings)
+router.post('/send-password-change-otp', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found' 
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOTP();
+    console.log(`🔐 Generated Password Change OTP for ${user.email}: ${otp}`);
+
+    // Delete any existing OTP for this user
+    await PasswordReset.deleteMany({ email: user.email.toLowerCase() });
+
+    // Store OTP
+    const passwordReset = new PasswordReset({
+      email: user.email.toLowerCase(),
+      otp
+    });
+    await passwordReset.save();
+
+    // Send email
+    await sendPasswordResetEmail(user.email, otp, user.name);
+    console.log(`✅ Password change OTP sent to ${user.email}`);
+
+    res.json({ 
+      success: true, 
+      message: 'Verification code sent to your email' 
+    });
+  } catch (error) {
+    console.error('Send password change OTP error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to send verification code' 
     });
   }
 });

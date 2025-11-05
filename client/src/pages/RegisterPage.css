@@ -67,13 +67,29 @@
 
 /* Title and Subtitle */
 .register-title {
-  margin: 0 0 0.5rem 0;
-  font-size: 2rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  margin: 0 0 0.75rem 0;
+  font-size: 2.25rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  letter-spacing: -0.8px;
+  text-align: center;
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+
+.register-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  border-radius: 2px;
 }
 
 .register-subtitle {

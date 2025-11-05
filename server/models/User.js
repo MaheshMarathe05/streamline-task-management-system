@@ -35,11 +35,6 @@ const UserSchema = new mongoose.Schema({
     method: { type: String, enum: ['totp', 'sms'], default: 'totp' },
     totpSecret: { type: String }, // store encrypted
     phone: { type: String }, // for SMS
-    // Single-use backup codes for MFA: store as hashes with usage tracking
-    backupCodes: [{ 
-      codeHash: String,
-      isUsed: { type: Boolean, default: false }
-    }],
     trustedDevices: [{ tokenHash: String, deviceName: String, lastUsedAt: Date, createdAt: { type: Date, default: Date.now } }],
   }
 });

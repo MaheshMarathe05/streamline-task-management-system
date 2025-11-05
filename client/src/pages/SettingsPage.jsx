@@ -150,11 +150,6 @@ const AccountSection = () => {
         {success && <div className="settings-success">{success}</div>}
         <button className="btn-primary" type="submit" disabled={submitting}>{submitting ? 'Updating...' : 'Reset Password'}</button>
       </form>
-      <hr style={{ margin: '16px 0', borderColor:'var(--border)' }}/>
-      <h3 className="settings-title">Backup Code MFA (Mandatory)</h3>
-      <div className="settings-form">
-        <BackupCodesPanel />
-      </div>
     </div>
   );
 };
@@ -445,54 +440,13 @@ function NotificationsSection() {
   );
 }
 
+// BackupCodesPanel removed - backup codes system has been replaced with OTP-based authentication
 function BackupCodesPanel() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [codes, setCodes] = useState([]);
-
-  const genCodes = async () => {
-    setLoading(true); setError(''); setSuccess('');
-    try {
-      const { generateBackupCodes } = await import('../services/api');
-      const res = await generateBackupCodes();
-      if (res.data?.success) {
-        setCodes(res.data.codes);
-        const blob = new Blob([res.data.codes.join('\n')], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'backup-codes.txt';
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(url);
-        setSuccess('Backup codes generated and downloaded.');
-      } else {
-        setError(res.data?.error || 'Failed to generate backup codes');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div>
-      <div style={{ color:'var(--muted)', marginBottom: 8 }}>Generate 8 secure, reusable backup codes. You must use one code at every login after your password.</div>
-      
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-        <button className="btn-primary" onClick={genCodes} disabled={loading}>
-          {loading?'Generating…':'Generate Backup Codes'}
-        </button>
+      <div style={{ color:'var(--muted)', marginBottom: 8 }}>
+        Backup codes have been removed. Password reset now uses email OTP verification.
       </div>
-      
-      {codes.length>0 && (
-        <div style={{ marginTop: 8 }}>
-          <div className="settings-title">Codes (also downloaded as .txt):</div>
-          <ul style={{ color:'var(--muted)' }}>
-            {codes.map(c => <li key={c}>{c}</li>)}
-          </ul>
-        </div>
-      )}
-      {error && <div className="settings-error" style={{ marginTop: 8 }}>{error}</div>}
-      {success && <div className="settings-success" style={{ marginTop: 8 }}>{success}</div>}
     </div>
   );
 }
