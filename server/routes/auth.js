@@ -63,6 +63,7 @@ router.post("/register", async (req, res) => {
 
     // Generate OTP
     const otp = generateOTP();
+    console.log(`🔐 Generated OTP for ${email}: ${otp}`);
 
     // Hash the password before storing temporarily
     const hashedPassword = await argon2.hash(password);
@@ -85,6 +86,7 @@ router.post("/register", async (req, res) => {
     // Send verification email
     try {
       await sendVerificationEmail(email, otp, name);
+      console.log(`✅ Verification email sent successfully to ${email}`);
       
       res.status(200).json({ 
         success: true, 
@@ -92,7 +94,7 @@ router.post("/register", async (req, res) => {
         requiresVerification: true
       });
     } catch (emailError) {
-      console.error('Email sending failed:', emailError);
+      console.error('❌ Email sending failed:', emailError);
       // Delete the verification record if email fails
       await EmailVerification.deleteOne({ email });
       res.status(500).json({ 

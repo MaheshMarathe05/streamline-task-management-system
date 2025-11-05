@@ -6,17 +6,21 @@ let transporter = null;
 function createTransporter() {
   if (transporter) return transporter;
 
-  // For development: Use ethereal.email (fake SMTP service)
-  // For production: Use Gmail, SendGrid, or your email service
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-    // Gmail configuration
+  // Gmail SMTP configuration
+  if (process.env.EMAIL_HOST_USER && process.env.EMAIL_HOST_PASSWORD) {
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // true for 465, false for other ports
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD // Use App Password for Gmail
+        user: process.env.EMAIL_HOST_USER,
+        pass: process.env.EMAIL_HOST_PASSWORD
+      },
+      tls: {
+        rejectUnauthorized: false
       }
     });
+    console.log('✅ Email transporter configured with Gmail SMTP');
   } else {
     // Development mode - log to console instead
     console.warn('⚠️  Email credentials not configured. Emails will be logged to console.');
@@ -40,7 +44,7 @@ export async function sendVerificationEmail(email, otp, name) {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'noreply@streamline.com',
+      from: `"Streamline Task Management" <${process.env.EMAIL_HOST_USER || 'noreply@streamline.com'}>`,
       to: email,
       subject: 'Verify Your Email - Streamline Task Management',
       html: `
@@ -99,13 +103,15 @@ export async function sendVerificationEmail(email, otp, name) {
     const info = await transporter.sendMail(mailOptions);
 
     // If using development mode (streamTransport), log the email
-    if (!process.env.EMAIL_USER) {
-      console.log('\n📧 VERIFICATION EMAIL (Development Mode)');
-      console.log('━'.repeat(50));
-      console.log(`To: ${email}`);
-      console.log(`OTP: ${otp}`);
-      console.log(`Name: ${name}`);
-      console.log('━'.repeat(50) + '\n');
+    if (!process.env.EMAIL_HOST_USER) {
+      console.log('\n' + '='.repeat(60));
+      console.log('📧 EMAIL VERIFICATION CODE (Development Mode)');
+      console.log('='.repeat(60));
+      console.log(`👤 Name:  ${name}`);
+      console.log(`📨 Email: ${email}`);
+      console.log(`🔑 OTP:   ${otp}`);
+      console.log('⏰ Valid for: 10 minutes');
+      console.log('='.repeat(60) + '\n');
     }
 
     return { success: true, messageId: info.messageId };
@@ -121,7 +127,7 @@ export async function sendWelcomeEmail(email, name) {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'noreply@streamline.com',
+      from: `"Streamline Task Management" <${process.env.EMAIL_HOST_USER || 'noreply@streamline.com'}>`,
       to: email,
       subject: '✅ Welcome to Streamline - Your Account is Ready!',
       html: `
@@ -172,7 +178,7 @@ export async function sendWelcomeEmail(email, name) {
 
     await transporter.sendMail(mailOptions);
 
-    if (!process.env.EMAIL_USER) {
+    if (!process.env.EMAIL_HOST_USER) {
       console.log(`\n📧 WELCOME EMAIL sent to ${email} (Development Mode)\n`);
     }
 
