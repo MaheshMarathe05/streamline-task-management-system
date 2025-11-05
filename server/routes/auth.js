@@ -1,6 +1,7 @@
 import express from "express";
 import User from "../models/User.js";
 import SecurityActivity from "../models/SecurityActivity.js";
+import EmailVerification from "../models/EmailVerification.js";
 import jwt from "jsonwebtoken";
 import argon2 from "argon2"; // Argon2id for password verification (memory-hard, GPU-resistant, modern PHC winner)
 import bcrypt from 'bcrypt';
@@ -8,6 +9,7 @@ import passport from "passport";
 import { protect } from "../middleware/authMiddleware.js";
 import SecurityLog from "../models/SecurityLog.js";
 import { authenticator } from 'otplib';
+import { generateOTP, sendVerificationEmail, sendWelcomeEmail } from "../utils/emailService.js";
 import crypto from 'crypto';
 import Notification from "../models/Notification.js";
 
@@ -46,40 +48,170 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ success: false, error: "Please provide all required fields." });
   }
 
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ success: false, error: "Please provide a valid email address." });
+  }
+
   try {
+    // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
-      return res.status(400).json({ success: false, error: "User already exists" });
+      return res.status(400).json({ success: false, error: "User already exists with this email" });
     }
 
-    // Create a new user instance WITHOUT backup codes initially
-    user = new User({ 
-      name, 
-      email, 
-      password, 
-      role
-      // No backup codes generated here anymore
+    // Generate OTP
+    const otp = generateOTP();
+
+    // Hash the password before storing temporarily
+    const hashedPassword = await argon2.hash(password);
+
+    // Delete any existing verification for this email
+    await EmailVerification.deleteOne({ email });
+
+    // Store verification data temporarily (expires in 10 minutes)
+    const verification = new EmailVerification({
+      email,
+      otp,
+      userData: {
+        name,
+        password: hashedPassword,
+        role
+      }
+    });
+    await verification.save();
+
+    // Send verification email
+    try {
+      await sendVerificationEmail(email, otp, name);
+      
+      res.status(200).json({ 
+        success: true, 
+        message: "Verification code sent to your email. Please check your inbox.",
+        requiresVerification: true
+      });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      // Delete the verification record if email fails
+      await EmailVerification.deleteOne({ email });
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to send verification email. Please try again or check your email address." 
+      });
+    }
+  } catch (err) {
+    console.error("Registration Error:", err.message);
+    res.status(500).json({ success: false, error: "Server error during registration" });
+  }
+});
+
+// New route: Verify email with OTP
+router.post("/verify-email", async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ success: false, error: "Email and OTP are required" });
+  }
+
+  try {
+    // Find verification record
+    const verification = await EmailVerification.findOne({ email });
+
+    if (!verification) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Verification code expired or invalid. Please register again." 
+      });
+    }
+
+    // Verify OTP
+    if (verification.otp !== otp.trim()) {
+      return res.status(400).json({ success: false, error: "Invalid verification code" });
+    }
+
+    // Create the actual user account
+    const user = new User({
+      name: verification.userData.name,
+      email: verification.email,
+      password: verification.userData.password, // Already hashed
+      role: verification.userData.role,
+      emailVerified: true
     });
     await user.save();
 
-    // Clear all existing notifications for this new user (if any exist)
+    // Clear notifications for new user
     try {
       await Notification.deleteMany({ user: user._id });
-      console.log(`✅ Cleared all notifications for new user: ${email}`);
+      console.log(`✅ Cleared notifications for new user: ${email}`);
     } catch (notifError) {
       console.error('Error clearing notifications:', notifError);
     }
 
-    try { await SecurityLog.create({ user: user._id, event: 'register', ip: req.ip, userAgent: req.headers['user-agent'] }); } catch {}
-    
-    // Return success - no backup codes needed
+    // Log security event
+    try { 
+      await SecurityLog.create({ 
+        user: user._id, 
+        event: 'register', 
+        ip: req.ip, 
+        userAgent: req.headers['user-agent'] 
+      }); 
+    } catch {}
+
+    // Delete verification record
+    await EmailVerification.deleteOne({ email });
+
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail(email, user.name).catch(err => 
+      console.error('Welcome email failed:', err)
+    );
+
     res.status(201).json({ 
       success: true, 
-      message: "Registration successful! Please login with your credentials."
+      message: "Email verified successfully! Your account has been created. Please login.",
+      emailVerified: true
     });
   } catch (err) {
-    console.error("Registration Error:", err.message);
-    res.status(500).json({ success: false, error: "Server error during registration" });
+    console.error("Email Verification Error:", err.message);
+    res.status(500).json({ success: false, error: "Server error during verification" });
+  }
+});
+
+// New route: Resend verification code
+router.post("/resend-verification", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, error: "Email is required" });
+  }
+
+  try {
+    // Check if verification exists
+    const verification = await EmailVerification.findOne({ email });
+
+    if (!verification) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "No pending verification found. Please register again." 
+      });
+    }
+
+    // Generate new OTP
+    const otp = generateOTP();
+    verification.otp = otp;
+    verification.createdAt = new Date(); // Reset expiry
+    await verification.save();
+
+    // Resend email
+    await sendVerificationEmail(email, otp, verification.userData.name);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Verification code resent successfully. Please check your email." 
+    });
+  } catch (err) {
+    console.error("Resend Verification Error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to resend verification code" });
   }
 });
 

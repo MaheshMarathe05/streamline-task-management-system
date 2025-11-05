@@ -7,6 +7,7 @@ import './RegisterPage.css';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const [step, setStep] = useState(1); // 1: Registration form, 2: OTP verification
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -14,11 +15,13 @@ const RegisterPage = () => {
     confirmPassword: '',
   });
   const [selectedRole, setSelectedRole] = useState('employee');
+  const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [fieldTouched, setFieldTouched] = useState({});
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const { name, email, password, confirmPassword } = formData;
 
@@ -102,59 +105,13 @@ const RegisterPage = () => {
     try {
       const res = await registerUser({ name, email, password, role: selectedRole });
 
-      if (res.success) {
-        // Registration successful - generate and download backup codes
-        try {
-          const backupResponse = await fetch('http://localhost:5000/api/auth/generate-backup-codes', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, password })
-          });
-          
-          if (backupResponse.ok) {
-            const backupData = await backupResponse.json();
-            
-            if (backupData.success && backupData.backupCodes) {
-              // Auto-download backup codes
-              const content = `🔐 Backup Codes for Account Recovery
-Generated: ${new Date().toLocaleString()}
-Account: ${email}
-Name: ${name}
-
-⚠️ IMPORTANT: Save these codes in a secure location!
-Each code can only be used once for password recovery.
-
-${backupData.backupCodes.map((code, index) => `${index + 1}. ${code}`).join('\n')}
-
-📝 Instructions:
-- Use these codes when you forget your password
-- Click "Forgot Password?" on login page
-- Enter your email and one backup code
-- You'll be able to reset your password
-- Generate new codes before these run out
-
-🔒 Keep these codes secure and private!`;
-
-              const blob = new Blob([content], { type: 'text/plain' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `backup-codes-${email.split('@')[0]}.txt`;
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              URL.revokeObjectURL(url);
-              
-              alert('Registration successful! Your backup codes have been downloaded automatically. Please keep them safe - you\'ll need them if you forget your password.');
-            }
-          }
-        } catch (backupError) {
-          console.log('Backup codes generation failed:', backupError);
-          alert('Registration successful! However, backup codes could not be generated. You can generate them later from the login page if needed.');
-        }
-        
+      if (res.success && res.requiresVerification) {
+        // Move to OTP verification step
+        setStep(2);
+        setError('');
+      } else if (res.success) {
+        // Old flow - direct registration (backward compatibility)
+        alert('Registration successful! Please login.');
         navigate('/');
       } else {
         setError(res.error || 'Registration failed. Please try again.');
@@ -166,13 +123,86 @@ ${backupData.backupCodes.map((code, index) => `${index + 1}. ${code}`).join('\n'
     }
   };
 
+  // Handle OTP verification
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+
+    if (!otp || otp.length !== 6) {
+      setError('Please enter a valid 6-digit code');
+      return;
+    }
+
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Email verified successfully! Your account has been created. Please login.');
+        navigate('/');
+      } else {
+        setError(data.error || 'Invalid verification code');
+      }
+    } catch (error) {
+      setError('Verification failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle resend OTP
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Verification code resent! Please check your email.');
+        setResendCooldown(60); // 60 second cooldown
+      } else {
+        setError(data.error || 'Failed to resend code');
+      }
+    } catch (error) {
+      setError('Failed to resend code. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Cooldown timer for resend
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
   return (
     <div className="register-container">
       <div className="register-card">
-        <h2 className="register-title">Create your Account</h2>
-        <p className="register-subtitle">Join our platform to manage your tasks.</p>
+        {step === 1 ? (
+          <>
+            <h2 className="register-title">Create your Account</h2>
+            <p className="register-subtitle">Join our platform to manage your tasks.</p>
 
-        <form onSubmit={handleSubmit} className="register-form">
+            <form onSubmit={handleSubmit} className="register-form">
               <div className="input-group">
                 <label htmlFor="name">Full Name</label>
                 <input 
@@ -327,6 +357,79 @@ ${backupData.backupCodes.map((code, index) => `${index + 1}. ${code}`).join('\n'
                 Sign In
               </Link>
             </p>
+          </>
+        ) : (
+          <>
+            <h2 className="register-title">📧 Verify Your Email</h2>
+            <p className="register-subtitle">
+              We've sent a 6-digit verification code to<br/>
+              <strong>{email}</strong>
+            </p>
+
+            <form onSubmit={handleVerifyOTP} className="register-form">
+              <div className="input-group">
+                <label htmlFor="otp">Verification Code</label>
+                <input
+                  type="text"
+                  id="otp"
+                  name="otp"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="Enter 6-digit code"
+                  maxLength="6"
+                  className="otp-input"
+                  required
+                  autoFocus
+                />
+                <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                  Code expires in 10 minutes
+                </p>
+              </div>
+
+              {error && <p className="error-message">{error}</p>}
+
+              <button type="submit" className="register-button" disabled={isLoading}>
+                {isLoading ? <div className="spinner"></div> : 'Verify Email'}
+              </button>
+            </form>
+
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <p style={{ fontSize: '14px', color: '#666' }}>
+                Didn't receive the code?{' '}
+                <button
+                  onClick={handleResendOTP}
+                  disabled={resendCooldown > 0 || isLoading}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: resendCooldown > 0 ? '#999' : '#667eea',
+                    cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer',
+                    textDecoration: 'underline',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}
+                >
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
+                </button>
+              </p>
+              <p style={{ fontSize: '14px', marginTop: '10px' }}>
+                <button
+                  onClick={() => setStep(1)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#667eea',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    fontSize: '14px'
+                  }}
+                >
+                  ← Change email address
+                </button>
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -26,6 +26,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: 'local'
   },
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
   twoFactor: {
     enabled: { type: Boolean, default: false },
     method: { type: String, enum: ['totp', 'sms'], default: 'totp' },
